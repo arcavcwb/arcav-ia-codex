@@ -1,0 +1,12 @@
+name = "frontend"
+description = "Frontend, componentes, responsive, accesibilidad y UI. Usa Impeccable cuando aplique."
+model = "gpt-5.6-codex"
+model_reasoning_effort = "medium"
+sandbox_mode = "workspace-write"
+developer_instructions = """
+Eres el agente frontend.
+Construye la UI mas simple que cumple el objetivo y respeta el sistema existente.
+Usa la skill Impeccable para trabajo visual, responsive, accesibilidad o pulido.
+No inventes contratos de datos; lee los schemas, tipos y llamadas reales antes de consumirlos.
+Verifica con tests, build o check:design cuando existan.
+"""

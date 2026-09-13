@@ -1,6 +1,6 @@
 import path from 'node:path';
 import fs from 'node:fs';
-import { showBanner, promptModeSelection, colors } from './ui.js';
+import { showBanner, colors } from './ui.js';
 import { scaffoldProject } from './scaffolder.js';
 import { runDoctor } from './doctor.js';
 import { PACKAGE_ROOT } from './utils.js';
@@ -20,19 +20,16 @@ export async function main() {
     showBanner();
     console.log(`
 ${colors.bold}USO:${colors.reset}
-  npx @arcav-ia/flow [directorio] [opciones]
-  npx github:arcavcwb/arcav-ia-flow [directorio] [opciones]
+  npx @arcav-ia/codex init [directorio]
+  npx github:arcavcwb/arcav-ia-codex init [directorio]
 
 ${colors.bold}COMANDOS & EJEMPLOS:${colors.reset}
-  npx @arcav-ia/flow init              Inyecta el flujo en el proyecto actual
-  npx @arcav-ia/flow .                 Inyecta el flujo en el proyecto actual
-  npx @arcav-ia/flow mi-proyecto       Crea un nuevo proyecto en ./mi-proyecto
-  npx @arcav-ia/flow --doctor          Ejecuta el chequeo de salud del entorno
+  npx @arcav-ia/codex init             Prepara el proyecto actual para Codex
+  npx @arcav-ia/codex init mi-proyecto Prepara ./mi-proyecto para Codex
+  npx @arcav-ia/codex --doctor         Ejecuta el diagnostico Codex
 
 ${colors.bold}OPCIONES:${colors.reset}
-  --mode <operative|enterprise>    Selecciona el modo sin interacción
   --doctor, --check-env            Ejecuta únicamente el diagnóstico de salud
-  -y, --yes                        Acepta los valores predeterminados
   -v, --version                    Muestra la versión instalada
   -h, --help                       Muestra esta ayuda
 `);
@@ -46,42 +43,32 @@ ${colors.bold}OPCIONES:${colors.reset}
     process.exit(code);
   }
 
-  // Parsear argumentos posicionales y flags
   let targetDir = process.cwd();
-  let mode = null;
-  let nonFlagArgs = [];
+  const nonFlagArgs = [];
 
   for (let i = 0; i < args.length; i++) {
     const arg = args[i];
-    if (arg === '--mode' && args[i + 1]) {
-      mode = args[i + 1];
-      i++;
-    } else if (arg.startsWith('--mode=')) {
-      mode = arg.split('=')[1];
-    } else if (!arg.startsWith('-')) {
+    if (!arg.startsWith('-')) {
       nonFlagArgs.push(arg);
     }
   }
 
-  if (nonFlagArgs.length > 0) {
-    const targetArg = nonFlagArgs[0];
-    if (targetArg !== 'init' && targetArg !== '.') {
-      targetDir = path.resolve(process.cwd(), targetArg);
-    }
-  }
-
-  if (!mode) {
-    if (args.includes('-y') || args.includes('--yes')) {
-      mode = 'operative';
-    } else {
-      mode = await promptModeSelection();
-    }
-  }
-
   try {
-    await scaffoldProject({ targetDir, mode });
+    if (nonFlagArgs[0] && nonFlagArgs[0] !== 'init') {
+      throw new Error(`Comando desconocido: ${nonFlagArgs[0]}`);
+    }
+
+    if (nonFlagArgs.length > 1) {
+      const targetArg = nonFlagArgs[1];
+      if (targetArg !== '.') {
+        targetDir = path.resolve(process.cwd(), targetArg);
+      }
+    }
+
+    const code = await scaffoldProject({ targetDir });
+    process.exit(code);
   } catch (error) {
-    console.error(`\n${colors.red}${colors.bold}Error al desplegar el flujo:${colors.reset}`, error.message);
+    console.error(`\n${colors.red}${colors.bold}Error al preparar Codex:${colors.reset}`, error.message);
     process.exit(1);
   }
 }
