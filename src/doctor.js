@@ -15,128 +15,128 @@ export const CORE_SKILLS = [
   'playwright-e2e-suite',
 ];
 
-export const SQUAD_AGENTS = [
-  'architect-agent',
-  'pr-reviewer-agent',
-  'po-agent',
-  'scrum-master-agent',
-  'designer-agent',
-  'frontend-dev-agent',
-  'backend-dev-agent',
-  'qa-agent',
-  'devops-agent',
-  'automation-agent',
+export const CODEX_AGENTS = [
+  'architect',
+  'frontend',
+  'backend',
+  'reviewer',
+  'qa',
 ];
 
+function commandExists(command) {
+  try {
+    execSync(`${command} --version`, { stdio: 'ignore' });
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+function hasFile(file) {
+  return fs.existsSync(file) && fs.statSync(file).isFile();
+}
+
+function hasDir(dir) {
+  return fs.existsSync(dir) && fs.statSync(dir).isDirectory();
+}
+
 export function runDoctor(targetDir = process.cwd()) {
-  console.log(`${colors.cyan}${colors.bold}🩺 Ejecutando Antigravity Doctor en:${colors.reset} ${targetDir}\n`);
+  console.log(`${colors.cyan}${colors.bold}Ejecutando Codex Doctor en:${colors.reset} ${targetDir}\n`);
   let issues = 0;
 
-  // 1. Git Repository
-  if (isGitRepo(targetDir)) {
-    console.log(`  ${colors.green}✓${colors.reset} Repositorio Git detectado e inicializado`);
+  if (commandExists('git')) {
+    console.log(`  ${colors.green}OK${colors.reset} Git disponible`);
   } else {
-    console.log(`  ${colors.yellow}⚠${colors.reset} No es un repositorio Git (ejecuta 'git init')`);
+    console.log(`  ${colors.red}ERR${colors.reset} Git no encontrado en PATH`);
     issues++;
   }
 
-  // 2. GitHub CLI
-  try {
-    execSync('gh --version', { stdio: 'ignore' });
+  if (isGitRepo(targetDir)) {
+    console.log(`  ${colors.green}OK${colors.reset} Repositorio Git detectado`);
+  } else {
+    console.log(`  ${colors.red}ERR${colors.reset} El destino no es un repositorio Git`);
+    issues++;
+  }
+
+  if (commandExists('gh')) {
     try {
-      const user = execSync('gh api user -q .login', { encoding: 'utf8' }).trim();
-      console.log(`  ${colors.green}✓${colors.reset} GitHub CLI (gh) autenticado como: ${colors.cyan}@${user}${colors.reset}`);
+      const user = execSync('gh api user -q .login', { encoding: 'utf8', stdio: ['ignore', 'pipe', 'ignore'] }).trim();
+      console.log(`  ${colors.green}OK${colors.reset} GitHub CLI autenticado como ${colors.cyan}@${user}${colors.reset}`);
     } catch {
-      console.log(`  ${colors.yellow}⚠${colors.reset} GitHub CLI (gh) instalado pero no autenticado (ejecuta 'gh auth login')`);
+      console.log(`  ${colors.yellow}WARN${colors.reset} GitHub CLI instalado, autenticacion no comprobable`);
+    }
+  } else {
+    console.log(`  ${colors.yellow}WARN${colors.reset} GitHub CLI no instalado; se omite validacion de PR`);
+  }
+
+  if (commandExists('codex')) {
+    console.log(`  ${colors.green}OK${colors.reset} Codex CLI disponible`);
+  } else {
+    console.log(`  ${colors.yellow}WARN${colors.reset} Codex CLI no encontrado en PATH`);
+  }
+
+  const requiredFiles = [
+    'AGENTS.md',
+    '.codex/config.toml',
+    'task.md',
+  ];
+
+  for (const file of requiredFiles) {
+    if (hasFile(path.join(targetDir, file))) {
+      console.log(`  ${colors.green}OK${colors.reset} ${file}`);
+    } else {
+      console.log(`  ${colors.red}ERR${colors.reset} Falta ${file}`);
       issues++;
     }
-  } catch {
-    console.log(`  ${colors.yellow}⚠${colors.reset} GitHub CLI (gh) no encontrado en PATH`);
-    issues++;
   }
 
-  // 3. Node & Environment
-  console.log(`  ${colors.green}✓${colors.reset} Entorno de ejecución: Node.js ${process.version}`);
-
-  // 4. .env Check
-  const envPath = path.join(targetDir, '.env');
-  if (fs.existsSync(envPath)) {
-    console.log(`  ${colors.green}✓${colors.reset} Archivo .env presente`);
-    const envContent = fs.readFileSync(envPath, 'utf8');
-    if (envContent.includes('PLANE_API_KEY')) {
-      console.log(`    ${colors.cyan}•${colors.reset} Plane API Key configurada`);
+  for (const agent of CODEX_AGENTS) {
+    const file = `.codex/agents/${agent}.toml`;
+    if (hasFile(path.join(targetDir, file))) {
+      console.log(`  ${colors.green}OK${colors.reset} ${file}`);
+    } else {
+      console.log(`  ${colors.red}ERR${colors.reset} Falta ${file}`);
+      issues++;
     }
-    if (envContent.includes('SUPABASE')) {
-      console.log(`    ${colors.cyan}•${colors.reset} Variables Supabase detectadas`);
-    }
-  } else {
-    console.log(`  ${colors.yellow}⚠${colors.reset} Archivo .env no encontrado en ${targetDir} (crea uno desde .env.example)`);
-    issues++;
   }
 
-  // 5. Core Skills Check
-  const skillsDir = path.join(targetDir, '.agents', 'skills');
-  let foundSkills = 0;
   for (const skill of CORE_SKILLS) {
-    if (fs.existsSync(path.join(skillsDir, skill))) {
-      foundSkills++;
+    const file = `.agents/skills/${skill}/SKILL.md`;
+    if (hasFile(path.join(targetDir, file))) {
+      console.log(`  ${colors.green}OK${colors.reset} ${file}`);
+    } else {
+      console.log(`  ${colors.red}ERR${colors.reset} Falta ${file}`);
+      issues++;
     }
   }
 
-  if (foundSkills === CORE_SKILLS.length) {
-    console.log(`  ${colors.green}✓${colors.reset} Todas las skills maestras presentes (${foundSkills}/${CORE_SKILLS.length})`);
+  if (hasDir(path.join(targetDir, 'docs', 'walkthroughs'))) {
+    console.log(`  ${colors.green}OK${colors.reset} docs/walkthroughs`);
   } else {
-    console.log(`  ${colors.yellow}⚠${colors.reset} Faltan skills maestras en .agents/skills/ (${foundSkills}/${CORE_SKILLS.length} encontradas)`);
+    console.log(`  ${colors.red}ERR${colors.reset} Falta docs/walkthroughs`);
     issues++;
   }
 
-  // 5b. Squad Agents Check
-  const agentsDir = path.join(targetDir, '.agents', 'agents');
-  let foundAgents = 0;
-  for (const agent of SQUAD_AGENTS) {
-    if (fs.existsSync(path.join(agentsDir, agent))) {
-      foundAgents++;
-    }
-  }
-
-  if (foundAgents === SQUAD_AGENTS.length) {
-    console.log(`  ${colors.green}✓${colors.reset} Todos los agentes del Squad presentes (${foundAgents}/${SQUAD_AGENTS.length})`);
-  } else {
-    console.log(`  ${colors.yellow}⚠${colors.reset} Faltan agentes del Squad en .agents/agents/ (${foundAgents}/${SQUAD_AGENTS.length} encontrados)`);
-    issues++;
-  }
-
-  // 6. Impeccable Design Check in package.json
   const pkgPath = path.join(targetDir, 'package.json');
-  if (fs.existsSync(pkgPath)) {
+  if (hasFile(pkgPath)) {
     try {
       const pkg = JSON.parse(fs.readFileSync(pkgPath, 'utf8'));
       if (pkg.scripts && pkg.scripts['check:design']) {
-        console.log(`  ${colors.green}✓${colors.reset} Script 'check:design' configurado en package.json`);
+        console.log(`  ${colors.green}OK${colors.reset} package.json incluye check:design`);
       } else {
-        console.log(`  ${colors.yellow}⚠${colors.reset} Script 'check:design' no configurado en package.json`);
+        console.log(`  ${colors.yellow}WARN${colors.reset} package.json no incluye check:design`);
       }
     } catch {
-      // ignore
+      console.log(`  ${colors.yellow}WARN${colors.reset} package.json no se pudo parsear`);
     }
-  }
-
-  // 7. Rules and Context files
-  const superulesPath = path.join(targetDir, '.agents', 'rules', 'superules.md');
-  const agentsPath = path.join(targetDir, 'AGENTS.md');
-  if (fs.existsSync(superulesPath) && fs.existsSync(agentsPath)) {
-    console.log(`  ${colors.green}✓${colors.reset} Reglas de gobernanza y AGENTS.md sincronizados`);
-  } else {
-    console.log(`  ${colors.yellow}⚠${colors.reset} Faltan superules.md o AGENTS.md`);
-    issues++;
   }
 
   console.log('');
   if (issues === 0) {
-    console.log(`${colors.green}${colors.bold}✨ Todo en orden. Tu entorno agéntico está 100% operativo.${colors.reset}\n`);
+    console.log(`${colors.green}${colors.bold}Todo en orden para Codex.${colors.reset}\n`);
     return 0;
-  } else {
-    console.log(`${colors.yellow}${colors.bold}⚠ Se detectaron ${issues} observación(es). Revisa los detalles anteriores.${colors.reset}\n`);
-    return 1;
   }
+
+  console.log(`${colors.red}${colors.bold}Se detectaron ${issues} problema(s) de estructura Codex.${colors.reset}\n`);
+  return 1;
 }

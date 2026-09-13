@@ -1,6 +1,6 @@
 # AGENTS.md - Constitucion Operativa Codex
 
-Este repositorio mantiene `@arcav-ia/codex`, un CLI personal para preparar proyectos con Codex.
+Este repositorio trabaja con Codex, Git y las skills locales en `.agents/skills`.
 
 ## Cero Asuncion
 
@@ -9,8 +9,15 @@ Lee el codigo y la documentacion real antes de decidir.
 
 ## Git Como Fuente De Verdad
 
-La trazabilidad vive en codigo, `task.md`, commits, Pull Requests y `docs/walkthroughs`.
-Nunca trabajes directo en `main`; usa ramas `feat/...` o `fix/...`.
+La trazabilidad vive en:
+
+- codigo
+- `task.md`
+- commits
+- Pull Requests
+- `docs/walkthroughs`
+
+Nunca trabajes directo en `main`. Usa ramas `feat/...` o `fix/...`.
 
 ## Ponytail / YAGNI
 
@@ -41,3 +48,9 @@ root -> frontend -> reviewer
 Feature compleja
 root -> architect -> frontend/backend -> reviewer -> qa
 ```
+
+## Calidad
+
+- Impeccable aplica a UI: accesibilidad, responsive, contraste AA y `check:design`.
+- Contract-first aplica a APIs externas, webhooks y payloads no confiables.
+- QA reporta evidencias y regresiones; no corrige silenciosamente.

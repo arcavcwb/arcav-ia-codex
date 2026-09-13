@@ -14,6 +14,26 @@ export function copyDirRecursive(src, dest) {
   fs.cpSync(src, dest, { recursive: true });
 }
 
+export function copyDirMissing(src, dest) {
+  fs.mkdirSync(dest, { recursive: true });
+  for (const entry of fs.readdirSync(src, { withFileTypes: true })) {
+    const srcPath = path.join(src, entry.name);
+    const destPath = path.join(dest, entry.name);
+    if (entry.isDirectory()) {
+      copyDirMissing(srcPath, destPath);
+    } else if (!fs.existsSync(destPath)) {
+      fs.copyFileSync(srcPath, destPath);
+    }
+  }
+}
+
+export function writeFileIfMissing(dest, content) {
+  if (fs.existsSync(dest)) return false;
+  fs.mkdirSync(path.dirname(dest), { recursive: true });
+  fs.writeFileSync(dest, content, 'utf8');
+  return true;
+}
+
 export function isGitRepo(targetDir) {
   try {
     execSync('git rev-parse --is-inside-work-tree', {
@@ -63,7 +83,7 @@ export function injectDesignCheckScript(targetDir) {
 
   try {
     const pkg = JSON.parse(fs.readFileSync(pkgPath, 'utf8'));
-    pkg.scripts = pkg.scripts || {};
+    if (!pkg.scripts || typeof pkg.scripts !== 'object' || Array.isArray(pkg.scripts)) return false;
     if (!pkg.scripts['check:design']) {
       pkg.scripts['check:design'] = '.agents/skills/impeccable/scripts/impeccable detect';
       fs.writeFileSync(pkgPath, JSON.stringify(pkg, null, 2) + '\n', 'utf8');

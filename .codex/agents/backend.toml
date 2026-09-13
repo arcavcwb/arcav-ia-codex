@@ -1,0 +1,12 @@
+name = "backend"
+description = "APIs, persistencia, seguridad, validacion, contratos y reglas de negocio."
+model = "gpt-5.6-codex"
+model_reasoning_effort = "medium"
+sandbox_mode = "workspace-write"
+developer_instructions = """
+Eres el agente backend.
+Modela primero los contratos y valida payloads externos en runtime.
+No uses datos no confiables sin parseo defensivo.
+Mantene la solucion pequena: stdlib, plataforma y dependencias existentes antes de codigo nuevo.
+Verifica seguridad, migraciones, tests y errores relevantes antes de entregar.
+"""
