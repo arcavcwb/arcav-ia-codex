@@ -1,0 +1,42 @@
+{
+  "schema_version": 1,
+  "epics": [
+    {"id": "EP-001", "title": "Backlog y calidad"}
+  ],
+  "stories": [
+    {
+      "id": "US-001",
+      "epic_id": "EP-001",
+      "title": "Enrutar trabajo por complejidad",
+      "acceptance_criteria": ["Cada tarea tiene una ruta justificable y evaluable"]
+    }
+  ],
+  "tasks": [
+    {
+      "id": "TASK-001",
+      "story_id": "US-001",
+      "title": "Contrato del backlog",
+      "description": "Formalizar el mínimo contrato de datos JSON",
+      "acceptance_criteria": ["El validador detecta entradas inválidas"],
+      "dependencies": [],
+      "status": "done",
+      "story_points": 2,
+      "risk": "low",
+      "complexity": {"scope": 1, "ambiguity": 0, "integration": 0, "impact": 0, "verification": 1},
+      "test_plan": ["npm test"]
+    },
+    {
+      "id": "TASK-002",
+      "story_id": "US-001",
+      "title": "Clasificador de complejidad",
+      "description": "Calcular el score y elegir un perfil sin invocar ningún modelo",
+      "acceptance_criteria": ["Los cinco criterios calculan un score entre 0 y 10", "El riesgo crítico requiere aprobación humana"],
+      "dependencies": ["TASK-001"],
+      "status": "ready",
+      "story_points": 3,
+      "risk": "high",
+      "complexity": {"scope": 1, "ambiguity": 1, "integration": 1, "impact": 2, "verification": 1},
+      "test_plan": ["npm test"]
+    }
+  ]
+}

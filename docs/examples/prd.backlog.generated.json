@@ -1,0 +1,234 @@
+{
+  "schema_version": 1,
+  "epics": [
+    {
+      "id": "EP-001",
+      "title": "Órdenes de servicio"
+    },
+    {
+      "id": "EP-002",
+      "title": "Clientes"
+    }
+  ],
+  "stories": [
+    {
+      "id": "US-001",
+      "epic_id": "EP-001",
+      "title": "Registrar orden",
+      "acceptance_criteria": [
+        "El cliente queda asociado a la orden",
+        "Cada prenda registra cantidad y precio"
+      ]
+    },
+    {
+      "id": "US-002",
+      "epic_id": "EP-001",
+      "title": "Emitir comprobante",
+      "acceptance_criteria": [
+        "La orden permite emitir un comprobante con el importe"
+      ]
+    },
+    {
+      "id": "US-003",
+      "epic_id": "EP-002",
+      "title": "Consultar clientes",
+      "acceptance_criteria": [
+        "El atendente puede buscar clientes por nombre"
+      ]
+    }
+  ],
+  "tasks": [
+    {
+      "id": "TASK-001",
+      "story_id": "US-001",
+      "title": "Prueba: El cliente queda asociado a la orden",
+      "description": "Diseñar una prueba de aceptación reproducible para: El cliente queda asociado a la orden. Contexto: Como atendente necesito registrar las prendas recibidas.",
+      "acceptance_criteria": [
+        "Existe evidencia de prueba para: El cliente queda asociado a la orden"
+      ],
+      "dependencies": [],
+      "status": "draft",
+      "story_points": 1,
+      "risk": "medium",
+      "complexity": {
+        "scope": 1,
+        "ambiguity": 2,
+        "integration": 0,
+        "impact": 1,
+        "verification": 1
+      },
+      "test_plan": [
+        "Definir pasos y resultado esperado del criterio: El cliente queda asociado a la orden"
+      ]
+    },
+    {
+      "id": "TASK-002",
+      "story_id": "US-001",
+      "title": "Implementar: El cliente queda asociado a la orden",
+      "description": "Implementar el comportamiento mínimo que satisface: El cliente queda asociado a la orden. Contexto: Como atendente necesito registrar las prendas recibidas.",
+      "acceptance_criteria": [
+        "El cliente queda asociado a la orden"
+      ],
+      "dependencies": [
+        "TASK-001"
+      ],
+      "status": "draft",
+      "story_points": 2,
+      "risk": "medium",
+      "complexity": {
+        "scope": 1,
+        "ambiguity": 2,
+        "integration": 0,
+        "impact": 1,
+        "verification": 1
+      },
+      "test_plan": [
+        "Ejecutar la prueba de aceptación definida en TASK-001; verificar GREEN y regresiones."
+      ]
+    },
+    {
+      "id": "TASK-003",
+      "story_id": "US-001",
+      "title": "Prueba: Cada prenda registra cantidad y precio",
+      "description": "Diseñar una prueba de aceptación reproducible para: Cada prenda registra cantidad y precio. Contexto: Como atendente necesito registrar las prendas recibidas.",
+      "acceptance_criteria": [
+        "Existe evidencia de prueba para: Cada prenda registra cantidad y precio"
+      ],
+      "dependencies": [],
+      "status": "draft",
+      "story_points": 1,
+      "risk": "medium",
+      "complexity": {
+        "scope": 1,
+        "ambiguity": 2,
+        "integration": 0,
+        "impact": 1,
+        "verification": 1
+      },
+      "test_plan": [
+        "Definir pasos y resultado esperado del criterio: Cada prenda registra cantidad y precio"
+      ]
+    },
+    {
+      "id": "TASK-004",
+      "story_id": "US-001",
+      "title": "Implementar: Cada prenda registra cantidad y precio",
+      "description": "Implementar el comportamiento mínimo que satisface: Cada prenda registra cantidad y precio. Contexto: Como atendente necesito registrar las prendas recibidas.",
+      "acceptance_criteria": [
+        "Cada prenda registra cantidad y precio"
+      ],
+      "dependencies": [
+        "TASK-003"
+      ],
+      "status": "draft",
+      "story_points": 2,
+      "risk": "medium",
+      "complexity": {
+        "scope": 1,
+        "ambiguity": 2,
+        "integration": 0,
+        "impact": 1,
+        "verification": 1
+      },
+      "test_plan": [
+        "Ejecutar la prueba de aceptación definida en TASK-003; verificar GREEN y regresiones."
+      ]
+    },
+    {
+      "id": "TASK-005",
+      "story_id": "US-002",
+      "title": "Prueba: La orden permite emitir un comprobante con el importe",
+      "description": "Diseñar una prueba de aceptación reproducible para: La orden permite emitir un comprobante con el importe.",
+      "acceptance_criteria": [
+        "Existe evidencia de prueba para: La orden permite emitir un comprobante con el importe"
+      ],
+      "dependencies": [],
+      "status": "draft",
+      "story_points": 1,
+      "risk": "medium",
+      "complexity": {
+        "scope": 1,
+        "ambiguity": 2,
+        "integration": 0,
+        "impact": 1,
+        "verification": 1
+      },
+      "test_plan": [
+        "Definir pasos y resultado esperado del criterio: La orden permite emitir un comprobante con el importe"
+      ]
+    },
+    {
+      "id": "TASK-006",
+      "story_id": "US-002",
+      "title": "Implementar: La orden permite emitir un comprobante con el importe",
+      "description": "Implementar el comportamiento mínimo que satisface: La orden permite emitir un comprobante con el importe.",
+      "acceptance_criteria": [
+        "La orden permite emitir un comprobante con el importe"
+      ],
+      "dependencies": [
+        "TASK-005"
+      ],
+      "status": "draft",
+      "story_points": 2,
+      "risk": "medium",
+      "complexity": {
+        "scope": 1,
+        "ambiguity": 2,
+        "integration": 0,
+        "impact": 1,
+        "verification": 1
+      },
+      "test_plan": [
+        "Ejecutar la prueba de aceptación definida en TASK-005; verificar GREEN y regresiones."
+      ]
+    },
+    {
+      "id": "TASK-007",
+      "story_id": "US-003",
+      "title": "Prueba: El atendente puede buscar clientes por nombre",
+      "description": "Diseñar una prueba de aceptación reproducible para: El atendente puede buscar clientes por nombre.",
+      "acceptance_criteria": [
+        "Existe evidencia de prueba para: El atendente puede buscar clientes por nombre"
+      ],
+      "dependencies": [],
+      "status": "draft",
+      "story_points": 1,
+      "risk": "medium",
+      "complexity": {
+        "scope": 1,
+        "ambiguity": 2,
+        "integration": 0,
+        "impact": 1,
+        "verification": 1
+      },
+      "test_plan": [
+        "Definir pasos y resultado esperado del criterio: El atendente puede buscar clientes por nombre"
+      ]
+    },
+    {
+      "id": "TASK-008",
+      "story_id": "US-003",
+      "title": "Implementar: El atendente puede buscar clientes por nombre",
+      "description": "Implementar el comportamiento mínimo que satisface: El atendente puede buscar clientes por nombre.",
+      "acceptance_criteria": [
+        "El atendente puede buscar clientes por nombre"
+      ],
+      "dependencies": [
+        "TASK-007"
+      ],
+      "status": "draft",
+      "story_points": 2,
+      "risk": "medium",
+      "complexity": {
+        "scope": 1,
+        "ambiguity": 2,
+        "integration": 0,
+        "impact": 1,
+        "verification": 1
+      },
+      "test_plan": [
+        "Ejecutar la prueba de aceptación definida en TASK-007; verificar GREEN y regresiones."
+      ]
+    }
+  ]
+}

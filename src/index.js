@@ -4,6 +4,7 @@ import { showBanner, colors } from './ui.js';
 import { scaffoldProject } from './scaffolder.js';
 import { runDoctor } from './doctor.js';
 import { PACKAGE_ROOT } from './utils.js';
+import { runPlanningCommand } from './backlog/command.js';
 
 export async function main() {
   const args = process.argv.slice(2);
@@ -27,6 +28,9 @@ ${colors.bold}COMANDOS & EJEMPLOS:${colors.reset}
   npx @arcav-ia/codex init             Prepara el proyecto actual para Codex
   npx @arcav-ia/codex init mi-proyecto Prepara ./mi-proyecto para Codex
   npx @arcav-ia/codex --doctor         Ejecuta el diagnostico Codex
+  npx @arcav-ia/codex backlog plan PRD.md --out backlog/tasks.json
+  npx @arcav-ia/codex backlog validate --file backlog/tasks.json
+  npx @arcav-ia/codex route TASK-001 --file backlog/tasks.json --json
 
 ${colors.bold}OPCIONES:${colors.reset}
   --doctor, --check-env            Ejecuta únicamente el diagnóstico de salud
@@ -34,6 +38,10 @@ ${colors.bold}OPCIONES:${colors.reset}
   -h, --help                       Muestra esta ayuda
 `);
     process.exit(0);
+  }
+
+  if (args[0] === 'backlog' || args[0] === 'route') {
+    process.exit(runPlanningCommand(args));
   }
 
   showBanner();
