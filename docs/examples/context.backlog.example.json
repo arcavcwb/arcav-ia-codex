@@ -1,0 +1,14 @@
+{
+  "schema_version": 1,
+  "epics": [{ "id": "EP-001", "title": "Control de calidad" }],
+  "stories": [{ "id": "US-001", "epic_id": "EP-001", "title": "Entrega acotada", "acceptance_criteria": ["Se prepara una tarea verificable"] }],
+  "tasks": [{
+    "id": "TASK-002", "story_id": "US-001", "title": "Revisar contrato del paquete",
+    "description": "Validar que la CLI muestra un contrato con límites de contexto",
+    "acceptance_criteria": ["El paquete no excede el presupuesto de bytes"],
+    "test_plan": ["npm test"], "dependencies": [], "status": "ready",
+    "story_points": 2, "priority": 2, "risk": "low",
+    "complexity": { "scope": 1, "ambiguity": 0, "integration": 0, "impact": 0, "verification": 1 },
+    "context_files": ["src/execution/packet.js"]
+  }]
+}
