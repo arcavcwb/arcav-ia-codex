@@ -174,3 +174,25 @@ Cada tarea puede incluir `context_files` como array opcional de rutas relativas 
 El paquete describe los gates **RED → GREEN → REFACTOR → REVIEW → QA** y recomienda perfiles de modelo. No los ejecuta ni certifica su cumplimiento. El revisor futuro debe recibir contrato + diff + evidencia de pruebas, **no el historial completo del implementador**. Las tareas `draft`, las dependencias pendientes y los riesgos `critical` siguen bloqueados. `--json` imprime el contenido de los archivos seleccionados; revisar manualmente esos archivos para evitar secretos incrustados en código fuente antes de compartir los paquetes con modelos o terceros. No existe aún un detector automático de secretos.
 
 Ejemplo: [`docs/examples/context.backlog.example.json`](docs/examples/context.backlog.example.json). Alcance y pruebas: [`docs/walkthroughs/task-context-packets-mvp.md`](docs/walkthroughs/task-context-packets-mvp.md).
+
+## Ejecutor piloto de una tarea (incremento 5 · opt-in)
+
+**Por defecto no ejecuta Codex.** Prepara una única invocación no interactiva con el paquete mínimo de la tarea:
+
+```bash
+node bin/cli.js task run TASK-002 --file docs/examples/context.backlog.example.json \
+  --repo . --models docs/examples/models.example.json --json
+```
+
+El comando de arriba es un **dry-run**: devuelve modelo elegido, bytes de prompt, tiempo y presupuesto orientativo, **sin mostrar el código de los archivos ni lanzar procesos**. Los modelos de `models.example.json` son de ejemplo; configura identificadores reales compatibles con tu Codex local antes de ejecutar.
+
+**Solo para uso consciente en una rama de feature limpia**, después de verificar la configuración de Codex y los modelos accesibles:
+
+```bash
+node bin/cli.js task run TASK-002 --file backlog/tasks.json --repo . \
+  --models models.local.json --max-total-tokens 4000 --timeout-seconds 120 --execute
+```
+
+Controles: la ejecución requiere `--execute`, presupuesto y timeout explícitos, `model_id` configurado, tarea `ready`, riesgo no crítico, Git con rama distinta de main/master y worktree limpio. Inicia `codex exec` con `--sandbox workspace-write --ask-for-approval never --json` sin shell. El resultado no transmite contenido del modelo: solo estado y métricas de tokens recogidas de `turn.completed`. No crea commits, pushes ni merges desde nuestro CLI.
+
+**Limitación fundamental:** `--max-total-tokens` **no** es un límite duro ni de facturación. La telemetría de `codex exec --json` se observa al completarse un turno; un turno puede gastar más del presupuesto antes de que podamos detener el proceso. La ejecución final exige **code review manual**; el programa no certifica TDD ni seguridad. Los tests del ejecutor usan simulaciones, **no llaman a modelos reales**. Ver `docs/walkthroughs/task-execution-pilot.md`.
