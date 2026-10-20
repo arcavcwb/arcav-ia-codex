@@ -1,0 +1,193 @@
+{
+  "schema_version": 1,
+  "epics": [
+    {
+      "id": "EP-001",
+      "title": "Gestión de órdenes"
+    }
+  ],
+  "stories": [
+    {
+      "id": "US-001",
+      "epic_id": "EP-001",
+      "title": "Registrar orden",
+      "acceptance_criteria": [
+        "Crear una orden válida"
+      ]
+    }
+  ],
+  "tasks": [
+    {
+      "story_id": "US-001",
+      "description": "Entrega atomica",
+      "acceptance_criteria": [
+        "Se cumple el criterio"
+      ],
+      "test_plan": [
+        "npm test"
+      ],
+      "risk": "low",
+      "complexity": {
+        "scope": 1,
+        "ambiguity": 0,
+        "integration": 0,
+        "impact": 0,
+        "verification": 1
+      },
+      "dependencies": [],
+      "id": "TASK-001",
+      "title": "Contrato de orden",
+      "status": "done",
+      "story_points": 2,
+      "priority": 1
+    },
+    {
+      "story_id": "US-001",
+      "description": "Entrega atomica",
+      "acceptance_criteria": [
+        "Se cumple el criterio"
+      ],
+      "test_plan": [
+        "npm test"
+      ],
+      "risk": "low",
+      "complexity": {
+        "scope": 1,
+        "ambiguity": 0,
+        "integration": 0,
+        "impact": 0,
+        "verification": 1
+      },
+      "dependencies": [
+        "TASK-001"
+      ],
+      "id": "TASK-002",
+      "title": "Pruebas de orden",
+      "status": "ready",
+      "story_points": 2,
+      "priority": 1
+    },
+    {
+      "story_id": "US-001",
+      "description": "Entrega atomica",
+      "acceptance_criteria": [
+        "Se cumple el criterio"
+      ],
+      "test_plan": [
+        "npm test"
+      ],
+      "risk": "low",
+      "complexity": {
+        "scope": 1,
+        "ambiguity": 0,
+        "integration": 0,
+        "impact": 0,
+        "verification": 1
+      },
+      "dependencies": [
+        "TASK-002"
+      ],
+      "id": "TASK-003",
+      "title": "Implementar creación de orden",
+      "status": "draft",
+      "story_points": 3,
+      "priority": 1
+    },
+    {
+      "story_id": "US-001",
+      "description": "Entrega atomica",
+      "acceptance_criteria": [
+        "Se cumple el criterio"
+      ],
+      "test_plan": [
+        "npm test"
+      ],
+      "risk": "low",
+      "complexity": {
+        "scope": 1,
+        "ambiguity": 0,
+        "integration": 0,
+        "impact": 0,
+        "verification": 1
+      },
+      "dependencies": [],
+      "id": "TASK-004",
+      "title": "Validar input",
+      "status": "ready",
+      "story_points": 3,
+      "priority": 2
+    },
+    {
+      "story_id": "US-001",
+      "description": "Entrega atomica",
+      "acceptance_criteria": [
+        "Se cumple el criterio"
+      ],
+      "test_plan": [
+        "npm test"
+      ],
+      "risk": "critical",
+      "complexity": {
+        "scope": 1,
+        "ambiguity": 0,
+        "integration": 0,
+        "impact": 0,
+        "verification": 1
+      },
+      "dependencies": [],
+      "id": "TASK-005",
+      "title": "Revisar permisos críticos",
+      "status": "ready",
+      "story_points": 5,
+      "priority": 1
+    },
+    {
+      "story_id": "US-001",
+      "description": "Entrega atomica",
+      "acceptance_criteria": [
+        "Se cumple el criterio"
+      ],
+      "test_plan": [
+        "npm test"
+      ],
+      "risk": "low",
+      "complexity": {
+        "scope": 1,
+        "ambiguity": 0,
+        "integration": 0,
+        "impact": 0,
+        "verification": 1
+      },
+      "dependencies": [],
+      "id": "TASK-006",
+      "title": "Documentar operación",
+      "status": "ready",
+      "story_points": 1,
+      "priority": 3
+    },
+    {
+      "story_id": "US-001",
+      "description": "Entrega atomica",
+      "acceptance_criteria": [
+        "Se cumple el criterio"
+      ],
+      "test_plan": [
+        "npm test"
+      ],
+      "risk": "low",
+      "complexity": {
+        "scope": 1,
+        "ambiguity": 0,
+        "integration": 0,
+        "impact": 0,
+        "verification": 1
+      },
+      "dependencies": [],
+      "id": "TASK-007",
+      "title": "Tarea grande posterior",
+      "status": "ready",
+      "story_points": 8,
+      "priority": 4
+    }
+  ]
+}

@@ -91,3 +91,35 @@ test('backlog plan informa errores y no crea salida si PRD inválido',()=>inTemp
   assert.match(r.stderr,/sin criterios/i);
   assert.equal(existsSync(out),false);
 }));
+
+test('sprint plan --json respeta capacidad y devuelve selección y ruta sin invocar modelos',()=>inTemp(dir=>{
+  const file=path.join(dir,'tasks.json');
+  writeFileSync(file,JSON.stringify({...data,tasks:[task,{...task,id:'TASK-002',priority:1,story_points:2,status:'ready'}]}));
+  const r=run(dir,'sprint','plan','--file',file,'--capacity','2','--json');
+  assert.equal(r.status,0,r.stderr);
+  const plan=JSON.parse(r.stdout);
+  assert.equal(plan.execution,'dry-run');
+  assert.deepEqual(plan.selected.map(t=>t.id),['TASK-002']);
+  assert.deepEqual(plan.deferred.map(t=>t.id),['TASK-001']);
+}));
+
+test('sprint plan en modo texto informa bloqueos y no sobrescribe datos',()=>inTemp(dir=>{
+  const file=path.join(dir,'tasks.json');
+  const source=JSON.stringify({...data,tasks:[{...task,status:'draft'}, {...task,id:'TASK-002',risk:'critical'}]});
+  writeFileSync(file,source);
+  const r=run(dir,'sprint','plan','--file',file,'--capacity','3');
+  assert.equal(r.status,0,r.stderr);
+  assert.match(r.stdout,/BLOCKED TASK-001/);
+  assert.match(r.stdout,/BLOCKED TASK-002/);
+  assert.equal(readFileSync(file,'utf8'),source);
+}));
+
+test('sprint plan exige capacidad válida y no admite salida que escriba',()=>inTemp(dir=>{
+  const file=path.join(dir,'tasks.json');writeFileSync(file,JSON.stringify(data));
+  assert.equal(run(dir,'sprint','plan','--file',file).status,1);
+  assert.equal(run(dir,'sprint','plan','--capacity','-1','--file',file).status,1);
+  assert.equal(run(dir,'sprint','plan','--capacity','0','--file',file).status,1);
+  assert.equal(run(dir,'sprint','plan','--capacity','2','--out','plan.json','--file',file).status,1);
+  assert.equal(existsSync(path.join(dir,'plan.json')),false);
+  assert.equal(run(dir,'backlog','validate','--file',file,'--capacity','3').status,1);
+}));

@@ -140,3 +140,21 @@ El parser también reconoce encabezados `História` y `Critérios de aceitação
 El parser emite advertencias por contenido global que no mapea a historias y rechaza historias sin criterios verificables. **No acepta PRDs arbitrarios para descomposición inteligente:** esa capacidad necesitará un paso de análisis asistido por modelo, con aprobación y cobertura de requisitos. Un PRD en prosa debe estructurarse primero.
 
 Ejemplo de entrada: [`docs/examples/prd.example.md`](docs/examples/prd.example.md). Salida de muestra: [`docs/examples/prd.backlog.generated.json`](docs/examples/prd.backlog.generated.json). Evidencias y límites: [`docs/walkthroughs/prd-to-backlog-mvp.md`](docs/walkthroughs/prd-to-backlog-mvp.md).
+
+## Sprint Planner (dry-run)
+
+Usa un backlog **validado** con tareas `ready` y capacidad expresada en story points:
+
+```bash
+node bin/cli.js sprint plan --file docs/examples/sprint.backlog.example.json --capacity 6
+node bin/cli.js sprint plan --file docs/examples/sprint.backlog.example.json --capacity 6 --json
+```
+
+`priority` es opcional por tarea (entero `1..5`, donde `1` es la prioridad mayor). Si falta, se considera prioridad `3` para no romper los backlogs anteriores. La selección ordena por prioridad y después por ID, usando un llenado voraz determinista: una tarea que no cabe queda `deferred`, pero se pueden seleccionar tareas posteriores que sí caben.
+
+- Solo se seleccionan tareas `ready` con todas sus dependencias en `done`. Las tareas `draft` o `blocked` se informan como bloqueadas; las terminadas o ya iniciadas quedan fuera.
+- Las tareas con `risk: critical` **no se seleccionan**: falta aún un contrato explícito de autorización humana.
+- Muestra modelos sugeridos por el router, sin invocar agentes. Los identificadores reales se asignan con `--models docs/examples/models.example.json` si están configurados localmente.
+- No modifica estados, archivos, sprints ni presupuestos; **no ejecuta TDD ni QA**. Es una propuesta revisable, no un compromiso automático de sprint.
+
+Siguiente etapa: autorización explícita para tareas críticas, persistencia/versionado del sprint y ejecución controlada con quality gates.
