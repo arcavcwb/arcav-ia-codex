@@ -196,3 +196,22 @@ node bin/cli.js task run TASK-002 --file backlog/tasks.json --repo . \
 Controles: la ejecución requiere `--execute`, presupuesto y timeout explícitos, `model_id` configurado, tarea `ready`, riesgo no crítico, Git con rama distinta de main/master y worktree limpio. Inicia `codex exec` con `--sandbox workspace-write --ask-for-approval never --json` sin shell. El resultado no transmite contenido del modelo: solo estado y métricas de tokens recogidas de `turn.completed`. No crea commits, pushes ni merges desde nuestro CLI.
 
 **Limitación fundamental:** `--max-total-tokens` **no** es un límite duro ni de facturación. La telemetría de `codex exec --json` se observa al completarse un turno; un turno puede gastar más del presupuesto antes de que podamos detener el proceso. La ejecución final exige **code review manual**; el programa no certifica TDD ni seguridad. Los tests del ejecutor usan simulaciones, **no llaman a modelos reales**. Ver `docs/walkthroughs/task-execution-pilot.md`.
+
+## Quality Gate del diff (incremento 6)
+
+Después de que una tarea haya modificado una **rama de feature**, inspecciona el diff sin ejecutar agentes ni modelos:
+
+```bash
+node bin/cli.js task verify TASK-001 --file backlog/tasks.json --repo . --json
+```
+
+Para **autorizar expresamente la ejecución** del script `npm test` del repositorio:
+
+```bash
+node bin/cli.js task verify TASK-001 --file backlog/tasks.json --repo . \
+  --run-tests --test-timeout-seconds 120 --json
+```
+
+Requiere Git, una rama diferente de `main`/`master`, un `main` local que permita calcular el ancestro común, una tarea `ready`, `in_progress` o `in_review`, riesgo no crítico y dependencias completadas. Evalúa el diff desde el ancestro común de `main`, archivos sin registrar, errores de whitespace (`git diff --check`), SHA-256 del diff y, bajo `--run-tests`, la salida de `npm test` con timeout. No lee secretos deliberadamente ni imprime el contenido completo del diff o los logs de pruebas. La revisión solo queda **solicitable** si se verificó un cambio real, no hay archivos sin registrar, no hay errores de formato y se ejecutaron pruebas satisfactoriamente.
+
+**Límites:** `npm test` ejecuta scripts definidos por el proyecto y puede tener efectos secundarios; utilízalo solo en repositorios confiables. Pasar estas verificaciones **no certifica** TDD RED-first ni revisión independiente y **nunca autoriza un merge**. No se ejecuta `codex`, ni se hacen `git add`, commits o push. Más información en [`docs/walkthroughs/task-quality-gate-mvp.md`](docs/walkthroughs/task-quality-gate-mvp.md).

@@ -33,6 +33,7 @@ ${colors.bold}COMANDOS & EJEMPLOS:${colors.reset}
   npx @arcav-ia/codex route TASK-001 --file backlog/tasks.json --json
   npx @arcav-ia/codex sprint plan --file backlog/tasks.json --capacity 8 --json
   npx @arcav-ia/codex task prepare TASK-001 --file backlog/tasks.json --repo . --json
+  npx @arcav-ia/codex task verify TASK-001 --file backlog/tasks.json --repo . --run-tests --json
   npx @arcav-ia/codex task run TASK-001 --file backlog/tasks.json --models models.json --json
 
 ${colors.bold}OPCIONES:${colors.reset}
