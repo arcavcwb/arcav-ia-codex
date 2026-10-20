@@ -68,6 +68,10 @@ export function validateBacklog(backlog) {
     }
     validateStrings(item, 'acceptance_criteria', label, { min: 1 });
     validateStrings(item, 'test_plan', label, { min: 1 });
+    if (item.context_files !== undefined && (
+      !Array.isArray(item.context_files) || item.context_files.length > 12 ||
+      item.context_files.some(v => !filled(v)) || new Set(item.context_files).size !== item.context_files.length
+    )) errors.push(`${label}.context_files: máximo 12 rutas únicas no vacías.`);
     if (!record(item.complexity)) {
       errors.push(`${label}.complexity: se requiere un objeto con cinco dimensiones.`);
     } else {
