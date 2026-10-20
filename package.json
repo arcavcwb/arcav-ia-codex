@@ -18,6 +18,7 @@
   "scripts": {
     "start": "node ./bin/cli.js",
     "doctor": "node ./bin/cli.js --doctor",
+    "test": "node --test tests/*.test.js",
     "check:design": "bash ./templates/core-skills/impeccable/scripts/impeccable detect"
   },
   "keywords": [
