@@ -6,6 +6,7 @@ import { loadModelProfiles, routeTask } from '../routing/router.js';
 import { planSprint } from '../sprint/planner.js';
 import { prepareTaskPacket } from '../execution/packet.js';
 import { planTaskExecution, executeTaskPlan } from '../execution/runner.js';
+import { verifyTaskChanges } from '../execution/verify.js';
 
 function readJSON(file) {
   try {
@@ -15,12 +16,13 @@ function readJSON(file) {
   }
 }
 function parseFlags(args) {
-  const options = {file:'backlog/tasks.json',models:null,out:null,json:false,capacity:null,repo:null,'max-context-bytes':null,'max-total-tokens':null,'timeout-seconds':null,execute:false}, positionals=[];
+  const options = {file:'backlog/tasks.json',models:null,out:null,json:false,capacity:null,repo:null,'max-context-bytes':null,'max-total-tokens':null,'timeout-seconds':null,execute:false,'run-tests':false,'test-timeout-seconds':null}, positionals=[];
   for (let i=0; i<args.length; i++) {
     const arg=args[i];
     if (arg === '--json') {options.json=true;continue;}
     if (arg === '--execute') {options.execute=true;continue;}
-    if (arg === '--file' || arg === '--models' || arg === '--out' || arg === '--capacity' || arg === '--repo' || arg === '--max-context-bytes' || arg === '--max-total-tokens' || arg === '--timeout-seconds') {
+    if (arg === '--run-tests') {options['run-tests']=true;continue;}
+    if (arg === '--file' || arg === '--models' || arg === '--out' || arg === '--capacity' || arg === '--repo' || arg === '--max-context-bytes' || arg === '--max-total-tokens' || arg === '--timeout-seconds' || arg === '--test-timeout-seconds') {
       if (!args[i+1] || args[i+1].startsWith('--')) throw new Error(`${arg} requiere una ruta.`);
       options[arg.slice(2)] = args[++i];continue;
     }
@@ -36,8 +38,32 @@ export async function runPlanningCommand(args) {
     const {options,positionals} = parseFlags(args);
     const [command,subcommand,taskId,...extra] = positionals;
     if (extra.length) throw new Error('Demasiados argumentos.');
+    if (command === 'task' && subcommand === 'verify' && taskId) {
+      if (options.out || options.models || options.capacity !== null || options.execute ||
+          options['max-context-bytes'] !== null || options['max-total-tokens'] !== null ||
+          options['timeout-seconds'] !== null) {
+        throw new Error('task verify sólo admite --file, --repo, --json, --run-tests y --test-timeout-seconds.');
+      }
+      if (options['test-timeout-seconds'] !== null && !options['run-tests']) {
+        throw new Error('--test-timeout-seconds exige --run-tests.');
+      }
+      const raw = options['test-timeout-seconds'];
+      if (raw !== null && !/^\d+$/.test(raw)) throw new Error('--test-timeout-seconds requiere un entero.');
+      const result = verifyTaskChanges(readJSON(options.file), taskId, {
+        repoRoot: options.repo ?? process.cwd(), runTests: options['run-tests'],
+        timeoutSeconds: raw === null ? 120 : Number(raw),
+      });
+      if (options.json) console.log(JSON.stringify(result, null, 2));
+      else {
+        console.log(`${taskId}: ${result.changed_files.length} archivos modificados, ${result.untracked_files.length} sin registrar.`);
+        console.log(`Diff: ${result.diff_sha256}; whitespace: ${result.checks.whitespace_clean ? 'OK' : 'ERROR'}.`);
+        console.log(`Tests: ${result.tests.executed ? (result.checks.tests_passed ? 'PASS' : 'FAIL') : 'NO EJECUTADOS'}.`);
+        console.log(`Revisión independiente: ${result.ready_for_independent_review ? 'LISTO PARA SOLICITAR' : 'BLOQUEADO'}. TDD RED no verificado.`);
+      }
+      return options['run-tests'] && !result.ready_for_independent_review ? 1 : 0;
+    }
     if (command === 'task' && subcommand === 'run' && taskId) {
-      if (options.out || options.capacity !== null) throw new Error('task run no admite --out ni --capacity.');
+      if (options['run-tests'] || options['test-timeout-seconds'] !== null || options.out || options.capacity !== null) throw new Error('task run no admite --out ni --capacity.');
       const numberOption = (key, defaultValue) => {
         const raw = options[key];
         if (raw === null) return defaultValue;
@@ -68,7 +94,7 @@ export async function runPlanningCommand(args) {
       return result.status === 'completed_needs_review' ? 0 : 1;
     }
     if (command === 'task' && subcommand === 'prepare' && taskId) {
-      if (options.out || options.capacity !== null || options.execute || options['max-total-tokens'] !== null || options['timeout-seconds'] !== null) throw new Error('task prepare no admite --out ni --capacity.');
+      if (options['run-tests'] || options['test-timeout-seconds'] !== null || options.out || options.capacity !== null || options.execute || options['max-total-tokens'] !== null || options['timeout-seconds'] !== null) throw new Error('task prepare no admite --out ni --capacity.');
       const max = options['max-context-bytes'];
       if (max !== null && !/^\d+$/.test(max)) throw new Error('--max-context-bytes requiere un entero.');
       const models = options.models ? loadModelProfiles(readJSON(options.models)) : {};
@@ -86,7 +112,7 @@ export async function runPlanningCommand(args) {
       return 0;
     }
     if (command === 'sprint' && subcommand === 'plan' && !taskId) {
-      if (options.execute || options['max-total-tokens'] !== null || options['timeout-seconds'] !== null || options.repo !== null || options['max-context-bytes'] !== null) throw new Error('sprint plan no admite --repo ni --max-context-bytes.');
+      if (options['run-tests'] || options['test-timeout-seconds'] !== null || options.execute || options['max-total-tokens'] !== null || options['timeout-seconds'] !== null || options.repo !== null || options['max-context-bytes'] !== null) throw new Error('sprint plan no admite --repo ni --max-context-bytes.');
       if (options.out) throw new Error('sprint plan no admite --out (salida de sólo lectura).');
       if (options.capacity === null || !/^\d+$/.test(options.capacity)) {
         throw new Error('sprint plan requiere --capacity con un entero positivo.');
@@ -103,7 +129,7 @@ export async function runPlanningCommand(args) {
       return 0;
     }
     if (command === 'backlog' && subcommand === 'plan' && taskId) {
-      if (options.execute || options['max-total-tokens'] !== null || options['timeout-seconds'] !== null || options.models || options.capacity !== null || options.repo !== null || options['max-context-bytes'] !== null || options.file !== 'backlog/tasks.json') {
+      if (options['run-tests'] || options['test-timeout-seconds'] !== null || options.execute || options['max-total-tokens'] !== null || options['timeout-seconds'] !== null || options.models || options.capacity !== null || options.repo !== null || options['max-context-bytes'] !== null || options.file !== 'backlog/tasks.json') {
         throw new Error('backlog plan sólo admite --out y --json.');
       }
       const markdown = fs.readFileSync(path.resolve(taskId), 'utf8');
@@ -122,7 +148,7 @@ export async function runPlanningCommand(args) {
     }
     if (command === 'backlog' && subcommand === 'validate' && !taskId) {
       if(options.out) throw new Error('backlog validate no admite --out.');
-      if (options.execute || options['max-total-tokens'] !== null || options['timeout-seconds'] !== null || options.models || options.json || options.capacity !== null || options.repo !== null || options['max-context-bytes'] !== null) throw new Error('backlog validate sólo admite --file.');
+      if (options['run-tests'] || options['test-timeout-seconds'] !== null || options.execute || options['max-total-tokens'] !== null || options['timeout-seconds'] !== null || options.models || options.json || options.capacity !== null || options.repo !== null || options['max-context-bytes'] !== null) throw new Error('backlog validate sólo admite --file.');
       const result = validateBacklog(readJSON(options.file));
       if (!result.valid) {
         console.error(`Backlog inválido: ${result.errors.length} error(es):`);
@@ -133,7 +159,7 @@ export async function runPlanningCommand(args) {
       return 0;
     }
     if (command === 'route' && subcommand && !taskId) {
-      if (options.execute || options['max-total-tokens'] !== null || options['timeout-seconds'] !== null || options.out || options.capacity !== null || options.repo !== null || options['max-context-bytes'] !== null) throw new Error('route no admite --out, --capacity, --repo ni --max-context-bytes.');
+      if (options['run-tests'] || options['test-timeout-seconds'] !== null || options.execute || options['max-total-tokens'] !== null || options['timeout-seconds'] !== null || options.out || options.capacity !== null || options.repo !== null || options['max-context-bytes'] !== null) throw new Error('route no admite --out, --capacity, --repo ni --max-context-bytes.');
       const backlog = readJSON(options.file);
       const report = validateBacklog(backlog);
       if (!report.valid) throw new Error(`Backlog inválido:\n- ${report.errors.join('\n- ')}`);
@@ -152,7 +178,7 @@ export async function runPlanningCommand(args) {
       }
       return 0;
     }
-    throw new Error('Comando esperado: backlog plan PRD.md [--out ruta] [--json], backlog validate [--file ruta], route TASK-ID [--file ruta] [--models ruta] [--json] o sprint plan --capacity N [--file ruta] [--models ruta] [--json], task prepare TASK-ID [--file ruta] [--repo directorio] [--max-context-bytes N] [--models ruta] [--json] o task run TASK-ID --models ruta [--max-total-tokens N] [--timeout-seconds N] [--execute].');
+    throw new Error('Comando esperado: backlog plan PRD.md [--out ruta] [--json], backlog validate [--file ruta], route TASK-ID [--file ruta] [--models ruta] [--json] o sprint plan --capacity N [--file ruta] [--models ruta] [--json], task prepare TASK-ID [--file ruta] [--repo directorio] [--max-context-bytes N] [--models ruta] [--json] o task run TASK-ID --models ruta [--max-total-tokens N] [--timeout-seconds N] [--execute] o task verify TASK-ID [--file ruta] [--repo directorio] [--run-tests] [--test-timeout-seconds N] [--json].');
   } catch(error) {
     console.error(error.message);
     return 1;
