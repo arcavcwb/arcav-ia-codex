@@ -63,6 +63,9 @@ export function validateBacklog(backlog) {
     if (!Number.isInteger(item.story_points) || item.story_points < 1 || item.story_points > 13) {
       errors.push(`${label}.story_points: se requiere un entero de 1 a 13.`);
     }
+    if (item.priority !== undefined && (!Number.isInteger(item.priority) || item.priority < 1 || item.priority > 5)) {
+      errors.push(`${label}.priority: si está presente, se requiere un entero de 1 a 5 (1 = máxima).`);
+    }
     validateStrings(item, 'acceptance_criteria', label, { min: 1 });
     validateStrings(item, 'test_plan', label, { min: 1 });
     if (!record(item.complexity)) {
