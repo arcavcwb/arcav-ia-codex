@@ -4,6 +4,7 @@ import { validateBacklog } from './validate.js';
 import { planBacklogFromPRD } from './prd.js';
 import { loadModelProfiles, routeTask } from '../routing/router.js';
 import { planSprint } from '../sprint/planner.js';
+import { prepareTaskPacket } from '../execution/packet.js';
 
 function readJSON(file) {
   try {
@@ -13,11 +14,11 @@ function readJSON(file) {
   }
 }
 function parseFlags(args) {
-  const options = {file:'backlog/tasks.json',models:null,out:null,json:false,capacity:null}, positionals=[];
+  const options = {file:'backlog/tasks.json',models:null,out:null,json:false,capacity:null,repo:null,'max-context-bytes':null}, positionals=[];
   for (let i=0; i<args.length; i++) {
     const arg=args[i];
     if (arg === '--json') {options.json=true;continue;}
-    if (arg === '--file' || arg === '--models' || arg === '--out' || arg === '--capacity') {
+    if (arg === '--file' || arg === '--models' || arg === '--out' || arg === '--capacity' || arg === '--repo' || arg === '--max-context-bytes') {
       if (!args[i+1] || args[i+1].startsWith('--')) throw new Error(`${arg} requiere una ruta.`);
       options[arg.slice(2)] = args[++i];continue;
     }
@@ -33,7 +34,26 @@ export function runPlanningCommand(args) {
     const {options,positionals} = parseFlags(args);
     const [command,subcommand,taskId,...extra] = positionals;
     if (extra.length) throw new Error('Demasiados argumentos.');
+    if (command === 'task' && subcommand === 'prepare' && taskId) {
+      if (options.out || options.capacity !== null) throw new Error('task prepare no admite --out ni --capacity.');
+      const max = options['max-context-bytes'];
+      if (max !== null && !/^\d+$/.test(max)) throw new Error('--max-context-bytes requiere un entero.');
+      const models = options.models ? loadModelProfiles(readJSON(options.models)) : {};
+      const packet = prepareTaskPacket(readJSON(options.file), taskId, {
+        repoRoot: options.repo ?? process.cwd(), models,
+        maxContextBytes: max === null ? undefined : Number(max),
+      });
+      if (options.json) console.log(JSON.stringify(packet, null, 2));
+      else {
+        console.log(`${packet.task.id}: paquete preparado (DRY-RUN), ${packet.packet_bytes}/${packet.max_context_bytes} bytes.`);
+        console.log(`Implementación: ${packet.routing.implementer.tier}; revisión: ${packet.routing.reviewer.tier}.`);
+        console.log(`Archivos incluidos: ${packet.context_files.map(f => f.path).join(', ') || 'ninguno'}.`);
+        console.log('Sin ejecución de modelos; usa --json para inspeccionar el contexto y quality gates.');
+      }
+      return 0;
+    }
     if (command === 'sprint' && subcommand === 'plan' && !taskId) {
+      if (options.repo !== null || options['max-context-bytes'] !== null) throw new Error('sprint plan no admite --repo ni --max-context-bytes.');
       if (options.out) throw new Error('sprint plan no admite --out (salida de sólo lectura).');
       if (options.capacity === null || !/^\d+$/.test(options.capacity)) {
         throw new Error('sprint plan requiere --capacity con un entero positivo.');
@@ -50,7 +70,7 @@ export function runPlanningCommand(args) {
       return 0;
     }
     if (command === 'backlog' && subcommand === 'plan' && taskId) {
-      if (options.models || options.capacity !== null || options.file !== 'backlog/tasks.json') {
+      if (options.models || options.capacity !== null || options.repo !== null || options['max-context-bytes'] !== null || options.file !== 'backlog/tasks.json') {
         throw new Error('backlog plan sólo admite --out y --json.');
       }
       const markdown = fs.readFileSync(path.resolve(taskId), 'utf8');
@@ -69,7 +89,7 @@ export function runPlanningCommand(args) {
     }
     if (command === 'backlog' && subcommand === 'validate' && !taskId) {
       if(options.out) throw new Error('backlog validate no admite --out.');
-      if (options.models || options.json || options.capacity !== null) throw new Error('backlog validate sólo admite --file.');
+      if (options.models || options.json || options.capacity !== null || options.repo !== null || options['max-context-bytes'] !== null) throw new Error('backlog validate sólo admite --file.');
       const result = validateBacklog(readJSON(options.file));
       if (!result.valid) {
         console.error(`Backlog inválido: ${result.errors.length} error(es):`);
@@ -80,7 +100,7 @@ export function runPlanningCommand(args) {
       return 0;
     }
     if (command === 'route' && subcommand && !taskId) {
-      if (options.out || options.capacity !== null) throw new Error('route no admite --out ni --capacity.');
+      if (options.out || options.capacity !== null || options.repo !== null || options['max-context-bytes'] !== null) throw new Error('route no admite --out, --capacity, --repo ni --max-context-bytes.');
       const backlog = readJSON(options.file);
       const report = validateBacklog(backlog);
       if (!report.valid) throw new Error(`Backlog inválido:\n- ${report.errors.join('\n- ')}`);
@@ -99,7 +119,7 @@ export function runPlanningCommand(args) {
       }
       return 0;
     }
-    throw new Error('Comando esperado: backlog plan PRD.md [--out ruta] [--json], backlog validate [--file ruta], route TASK-ID [--file ruta] [--models ruta] [--json] o sprint plan --capacity N [--file ruta] [--models ruta] [--json].');
+    throw new Error('Comando esperado: backlog plan PRD.md [--out ruta] [--json], backlog validate [--file ruta], route TASK-ID [--file ruta] [--models ruta] [--json] o sprint plan --capacity N [--file ruta] [--models ruta] [--json], o task prepare TASK-ID [--file ruta] [--repo directorio] [--max-context-bytes N] [--models ruta] [--json].');
   } catch(error) {
     console.error(error.message);
     return 1;

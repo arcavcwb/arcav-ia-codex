@@ -32,6 +32,7 @@ ${colors.bold}COMANDOS & EJEMPLOS:${colors.reset}
   npx @arcav-ia/codex backlog validate --file backlog/tasks.json
   npx @arcav-ia/codex route TASK-001 --file backlog/tasks.json --json
   npx @arcav-ia/codex sprint plan --file backlog/tasks.json --capacity 8 --json
+  npx @arcav-ia/codex task prepare TASK-001 --file backlog/tasks.json --repo . --json
 
 ${colors.bold}OPCIONES:${colors.reset}
   --doctor, --check-env            Ejecuta únicamente el diagnóstico de salud
@@ -41,7 +42,7 @@ ${colors.bold}OPCIONES:${colors.reset}
     process.exit(0);
   }
 
-  if (args[0] === 'backlog' || args[0] === 'route' || args[0] === 'sprint') {
+  if (args[0] === 'backlog' || args[0] === 'route' || args[0] === 'sprint' || args[0] === 'task') {
     process.exit(runPlanningCommand(args));
   }
 

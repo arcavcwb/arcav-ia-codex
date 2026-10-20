@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { spawnSync } from 'node:child_process';
-import { mkdtempSync, writeFileSync, rmSync, readFileSync, existsSync } from 'node:fs';
+import { mkdtempSync, writeFileSync, rmSync, readFileSync, existsSync, mkdirSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
 
@@ -122,4 +122,29 @@ test('sprint plan exige capacidad válida y no admite salida que escriba',()=>in
   assert.equal(run(dir,'sprint','plan','--capacity','2','--out','plan.json','--file',file).status,1);
   assert.equal(existsSync(path.join(dir,'plan.json')),false);
   assert.equal(run(dir,'backlog','validate','--file',file,'--capacity','3').status,1);
+}));
+
+
+test('task prepare entrega JSON de contexto acotado sin cambiar archivos',()=>inTemp(dir=>{
+  const source={...data,tasks:[{...task,context_files:['src/example.js']}]};
+  mkdirSync(path.join(dir,'src'));
+  const code=path.join(dir,'src','example.js');writeFileSync(code,'export const x = 3;\n');
+  const file=path.join(dir,'tasks.json');const before=JSON.stringify(source);writeFileSync(file,before);
+  const r=run(dir,'task','prepare','TASK-001','--file',file,'--repo',dir,'--max-context-bytes','4096','--json');
+  assert.equal(r.status,0,r.stderr);
+  const packet=JSON.parse(r.stdout);
+  assert.equal(packet.execution,'dry-run');assert.equal(packet.task.id,'TASK-001');
+  assert.equal(packet.context_files[0].content,'export const x = 3;\n');
+  assert.equal(packet.packet_bytes,Buffer.byteLength(JSON.stringify(packet),'utf8'));
+  assert.equal(readFileSync(file,'utf8'),before);
+  assert.equal(readFileSync(code,'utf8'),'export const x = 3;\n');
+}));
+
+test('task prepare no admite flags peligrosos y protege rutas',()=>inTemp(dir=>{
+  const file=path.join(dir,'tasks.json');writeFileSync(file,JSON.stringify(data));
+  assert.equal(run(dir,'task','prepare','TASK-001','--file',file,'--out','x.json').status,1);
+  assert.equal(run(dir,'task','prepare','TASK-001','--file',file,'--capacity','2').status,1);
+  assert.equal(run(dir,'task','prepare','TASK-001','--file',file,'--max-context-bytes','invalid').status,1);
+  assert.equal(run(dir,'task','prepare','TASK-X','--file',file).status,1);
+  assert.equal(run(dir,'sprint','plan','--file',file,'--capacity','2','--repo',dir).status,1);
 }));

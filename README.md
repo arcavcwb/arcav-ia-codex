@@ -158,3 +158,19 @@ node bin/cli.js sprint plan --file docs/examples/sprint.backlog.example.json --c
 - No modifica estados, archivos, sprints ni presupuestos; **no ejecuta TDD ni QA**. Es una propuesta revisable, no un compromiso automático de sprint.
 
 Siguiente etapa: autorización explícita para tareas críticas, persistencia/versionado del sprint y ejecución controlada con quality gates.
+
+## Task Context Packets (incremento 4 · dry-run)
+
+Prepara el contrato y el contexto **mínimo explícito** de una tarea `ready`, sin ejecutar agentes ni comandos del proyecto:
+
+```bash
+node bin/cli.js task prepare TASK-002 \
+  --file docs/examples/context.backlog.example.json --repo . --json
+# Opcional: --models docs/examples/models.example.json --max-context-bytes 16384
+```
+
+Cada tarea puede incluir `context_files` como array opcional de rutas relativas a `--repo`. **El sistema no descubre archivos automáticamente**: solo lee las rutas declaradas (máximo 12). Rechaza `../`, rutas absolutas, archivos ocultos, nombres sensibles, enlaces simbólicos, binarios, archivos fuera del repositorio y el exceso de presupuesto. El límite predeterminado es **32 KiB** de JSON compacto (configurable entre 4 y 128 KiB). En vez de truncar código silenciosamente, falla y solicita reducir el alcance. Las estimaciones son **bytes, no tokens**; requieren telemetría real cuando exista un ejecutor.
+
+El paquete describe los gates **RED → GREEN → REFACTOR → REVIEW → QA** y recomienda perfiles de modelo. No los ejecuta ni certifica su cumplimiento. El revisor futuro debe recibir contrato + diff + evidencia de pruebas, **no el historial completo del implementador**. Las tareas `draft`, las dependencias pendientes y los riesgos `critical` siguen bloqueados. `--json` imprime el contenido de los archivos seleccionados; revisar manualmente esos archivos para evitar secretos incrustados en código fuente antes de compartir los paquetes con modelos o terceros. No existe aún un detector automático de secretos.
+
+Ejemplo: [`docs/examples/context.backlog.example.json`](docs/examples/context.backlog.example.json). Alcance y pruebas: [`docs/walkthroughs/task-context-packets-mvp.md`](docs/walkthroughs/task-context-packets-mvp.md).
