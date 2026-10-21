@@ -8,6 +8,7 @@ import { prepareTaskPacket } from '../execution/packet.js';
 import { planTaskExecution, executeTaskPlan } from '../execution/runner.js';
 import { verifyTaskChanges } from '../execution/verify.js';
 import { prepareIndependentReview } from '../execution/review.js';
+import { planIndependentReview, executeIndependentReview } from '../execution/reviewer.js';
 
 function readJSON(file) {
   try {
@@ -41,8 +42,45 @@ export async function runPlanningCommand(args) {
     const [command,subcommand,taskId,...extra] = positionals;
     if (extra.length) throw new Error('Demasiados argumentos.');
     if ((options['include-diff'] || options['max-review-bytes'] !== null) &&
-        !(command === 'task' && subcommand === 'review' && taskId)) {
+        !(command === 'task' && (subcommand === 'review' || subcommand === 'review-run') && taskId)) {
       throw new Error('--include-diff y --max-review-bytes sólo corresponden a task review.');
+    }
+    if (command === 'task' && subcommand === 'review-run' && taskId) {
+      if (options.out || options.capacity !== null || options['max-context-bytes'] !== null) {
+        throw new Error('task review-run no admite --out, --capacity ni --max-context-bytes.');
+      }
+      if (!options.models) throw new Error('task review-run requiere --models con un modelo revisor.');
+      if (!options['run-tests'] || !options['include-diff']) throw new Error('task review-run requiere --run-tests y --include-diff para QA.');
+      if (options.execute && (options['max-total-tokens'] === null || options['timeout-seconds'] === null)) {
+        throw new Error('--execute requiere --max-total-tokens y --timeout-seconds explícitos.');
+      }
+      const numeric = (key, fallback) => {
+        const value = options[key];
+        if (value === null) return fallback;
+        if (!/^\\d+$/.test(value)) throw new Error(`--${key} requiere un entero positivo.`);
+        return Number(value);
+      };
+      const repoRoot = options.repo ?? process.cwd();
+      const models = loadModelProfiles(readJSON(options.models));
+      const handoff = prepareIndependentReview(readJSON(options.file), taskId, {
+        repoRoot, models, runTests: true, includeDiff: true,
+        timeoutSeconds: numeric('test-timeout-seconds',120),
+        maxReviewBytes: numeric('max-review-bytes',65536),
+      });
+      const plan = planIndependentReview(handoff, {
+        maxTotalTokens: numeric('max-total-tokens',8000),
+        timeoutSeconds: numeric('timeout-seconds',300),
+      });
+      if (!options.execute) {
+        const {prompt, ...publicPlan} = plan;
+        if (options.json) console.log(JSON.stringify({...publicPlan,warning:'Dry-run, no se invocó Codex. npm test se ejecutó. El límite de tokens no es duro.'},null,2));
+        else console.log(`DRY-RUN revisión de ${taskId}: ${plan.model_id}, ${plan.prompt_bytes} bytes. Usar --execute para invocar Codex.`);
+        return 0;
+      }
+      const result = await executeIndependentReview(plan,{repoRoot});
+      if (options.json) console.log(JSON.stringify(result,null,2));
+      else console.log(`${taskId}: ${result.status}, veredicto ${result.verdict ?? 'no disponible'}; revisión humana obligatoria.`);
+      return result.status === 'completed_needs_human_review' ? 0 : 1;
     }
     if (command === 'task' && subcommand === 'review' && taskId) {
       if (options.out || options.capacity !== null || options.execute ||

@@ -235,3 +235,8 @@ node bin/cli.js task review TASK-001 --file backlog/tasks.json --repo . \
 El handoff incluye la rama, `head_sha`, `base_sha`, SHA-256 del diff, archivos cambiados, resultado de `git diff --check`, pruebas ejecutadas y perfil sugerido de revisor independiente. Si fallan las comprobaciones o las pruebas no se han ejecutado, se bloquea la inclusión del diff. El límite del diff es **en bytes**, no en tokens. `--include-diff` solo se admite con un diff de texto y un QA aprobado; nunca se incluye el historial de conversación del implementador.
 
 **No se invoca Codex ni se certifica una revisión**: `independent_review_completed`, `tdd_red_proven` y `merge_approved` se mantienen en `false`. Los scripts de `npm test` pueden ejecutar código arbitrario y solo deben autorizarse en repositorios confiables. El revisor y el responsable humano deben analizar el código, los criterios y los posibles secretos. El CLI no crea commits ni modifica tareas. Detalles y límites: [`docs/walkthroughs/independent-review-handoff-mvp.md`](docs/walkthroughs/independent-review-handoff-mvp.md).
+
+
+## Revisión IA independiente (MVP 8 · opt-in)
+
+El comando `task review-run TASK-ID --file backlog/tasks.json --repo . --models models.local.json --run-tests --include-diff --json` prepara una sesión independiente y solo lectura del revisor; ejecuta `npm test` pero **no llama a Codex sin `--execute`**. Para invocar realmente al revisor se exigen `--execute --max-total-tokens 4000 --timeout-seconds 120`. Un informe `pass` es consultivo y requiere aprobación humana. Revisar riesgos y comandos en [`docs/walkthroughs/independent-review-execution-mvp.md`](docs/walkthroughs/independent-review-execution-mvp.md).
