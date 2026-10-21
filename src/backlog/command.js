@@ -7,6 +7,7 @@ import { planSprint } from '../sprint/planner.js';
 import { prepareTaskPacket } from '../execution/packet.js';
 import { planTaskExecution, executeTaskPlan } from '../execution/runner.js';
 import { verifyTaskChanges } from '../execution/verify.js';
+import { prepareIndependentReview } from '../execution/review.js';
 
 function readJSON(file) {
   try {
@@ -16,13 +17,14 @@ function readJSON(file) {
   }
 }
 function parseFlags(args) {
-  const options = {file:'backlog/tasks.json',models:null,out:null,json:false,capacity:null,repo:null,'max-context-bytes':null,'max-total-tokens':null,'timeout-seconds':null,execute:false,'run-tests':false,'test-timeout-seconds':null}, positionals=[];
+  const options = {file:'backlog/tasks.json',models:null,out:null,json:false,capacity:null,repo:null,'max-context-bytes':null,'max-total-tokens':null,'timeout-seconds':null,execute:false,'run-tests':false,'test-timeout-seconds':null,'include-diff':false,'max-review-bytes':null}, positionals=[];
   for (let i=0; i<args.length; i++) {
     const arg=args[i];
     if (arg === '--json') {options.json=true;continue;}
     if (arg === '--execute') {options.execute=true;continue;}
     if (arg === '--run-tests') {options['run-tests']=true;continue;}
-    if (arg === '--file' || arg === '--models' || arg === '--out' || arg === '--capacity' || arg === '--repo' || arg === '--max-context-bytes' || arg === '--max-total-tokens' || arg === '--timeout-seconds' || arg === '--test-timeout-seconds') {
+    if (arg === '--include-diff') {options['include-diff']=true;continue;}
+    if (arg === '--file' || arg === '--models' || arg === '--out' || arg === '--capacity' || arg === '--repo' || arg === '--max-context-bytes' || arg === '--max-total-tokens' || arg === '--timeout-seconds' || arg === '--test-timeout-seconds' || arg === '--max-review-bytes') {
       if (!args[i+1] || args[i+1].startsWith('--')) throw new Error(`${arg} requiere una ruta.`);
       options[arg.slice(2)] = args[++i];continue;
     }
@@ -38,6 +40,44 @@ export async function runPlanningCommand(args) {
     const {options,positionals} = parseFlags(args);
     const [command,subcommand,taskId,...extra] = positionals;
     if (extra.length) throw new Error('Demasiados argumentos.');
+    if ((options['include-diff'] || options['max-review-bytes'] !== null) &&
+        !(command === 'task' && subcommand === 'review' && taskId)) {
+      throw new Error('--include-diff y --max-review-bytes sólo corresponden a task review.');
+    }
+    if (command === 'task' && subcommand === 'review' && taskId) {
+      if (options.out || options.capacity !== null || options.execute ||
+          options['max-context-bytes'] !== null || options['max-total-tokens'] !== null ||
+          options['timeout-seconds'] !== null) {
+        throw new Error('task review no permite ejecución de modelos ni opciones de task run.');
+      }
+      if (options['test-timeout-seconds'] !== null && !options['run-tests']) {
+        throw new Error('--test-timeout-seconds exige --run-tests.');
+      }
+      if (options['max-review-bytes'] !== null && !options['include-diff']) {
+        throw new Error('--max-review-bytes exige --include-diff.');
+      }
+      const numeric = (key, defaultValue) => {
+        const raw = options[key];
+        if (raw === null) return defaultValue;
+        if (!/^\d+$/.test(raw)) throw new Error(`--${key} requiere un entero positivo.`);
+        return Number(raw);
+      };
+      const models = options.models ? loadModelProfiles(readJSON(options.models)) : {};
+      const result = prepareIndependentReview(readJSON(options.file), taskId, {
+        repoRoot: options.repo ?? process.cwd(), models,
+        runTests: options['run-tests'],
+        timeoutSeconds: numeric('test-timeout-seconds',120),
+        includeDiff: options['include-diff'],
+        maxReviewBytes: numeric('max-review-bytes',65536),
+      });
+      if (options.json) console.log(JSON.stringify(result, null, 2));
+      else {
+        console.log(`${taskId}: ${result.status}; ${result.qa.changed_files.length} archivos; QA ${result.qa.checks.tests_passed === true ? 'PASS' : 'NO CONFIRMADO'}.`);
+        console.log(`Revisor sugerido: ${result.reviewer.tier}; diff ${result.diff.sha256}.`);
+        console.log('Revisión independiente y aprobación humana todavía pendientes.');
+      }
+      return options['run-tests'] && result.status !== 'ready_for_independent_review' ? 1 : 0;
+    }
     if (command === 'task' && subcommand === 'verify' && taskId) {
       if (options.out || options.models || options.capacity !== null || options.execute ||
           options['max-context-bytes'] !== null || options['max-total-tokens'] !== null ||
@@ -178,7 +218,7 @@ export async function runPlanningCommand(args) {
       }
       return 0;
     }
-    throw new Error('Comando esperado: backlog plan PRD.md [--out ruta] [--json], backlog validate [--file ruta], route TASK-ID [--file ruta] [--models ruta] [--json] o sprint plan --capacity N [--file ruta] [--models ruta] [--json], task prepare TASK-ID [--file ruta] [--repo directorio] [--max-context-bytes N] [--models ruta] [--json] o task run TASK-ID --models ruta [--max-total-tokens N] [--timeout-seconds N] [--execute] o task verify TASK-ID [--file ruta] [--repo directorio] [--run-tests] [--test-timeout-seconds N] [--json].');
+    throw new Error('Comando esperado: backlog plan PRD.md [--out ruta] [--json], backlog validate [--file ruta], route TASK-ID [--file ruta] [--models ruta] [--json] o sprint plan --capacity N [--file ruta] [--models ruta] [--json], task prepare TASK-ID [--file ruta] [--repo directorio] [--max-context-bytes N] [--models ruta] [--json] o task run TASK-ID --models ruta [--max-total-tokens N] [--timeout-seconds N] [--execute] o task verify TASK-ID [--file ruta] [--repo directorio] [--run-tests] [--test-timeout-seconds N] [--json] o task review TASK-ID [--file ruta] [--repo directorio] [--models ruta] [--run-tests] [--include-diff] [--max-review-bytes N] [--json].');
   } catch(error) {
     console.error(error.message);
     return 1;
