@@ -25,7 +25,7 @@ El primer comando invoca `npm test` sobre el proyecto, que puede tener efectos s
 
 1. Valida el backlog, task ID, dependencias, riesgo y QA observada. Exige `npm test` exitoso, diff de texto y hash SHA-256 consistente.
 2. Sólo usa `reviewer.model_id` configurado mediante `--models`. Los alias Luna/Sol/Astra son lógicos: los identificadores reales no se adivinan.
-3. Prepara el prompt del revisor con **criterios, QA y diff**, no con el historial de la sesión implementadora. La revisión usa `codex exec --sandbox read-only --ask-for-approval never --ignore-user-config --ignore-rules --ephemeral --json -` en sesión nueva.
+3. Prepara el prompt del revisor con **criterios, QA y diff**, no con el historial de la sesión implementadora. La revisión usa `codex exec --sandbox read-only --ask-for-approval never --ephemeral --json -` en sesión nueva.
 4. Comprueba la rama, commit base y HEAD, diff y ausencia de archivos nuevos antes de iniciar; después verifica que no cambió el workspace. Si cambia, rechaza el informe.
 5. Consume eventos JSONL documentados `item.completed`/`agent_message` y `turn.completed`. Acepta solo respuesta JSON con `verdict: pass|needs_changes`, `summary` y hasta 30 `findings` estructurados (severidad, archivo, línea y explicación).
 6. Devuelve hallazgos y telemetría observada. Incluso `verdict: pass` significa **opinión automatizada pendiente de verificación humana**, no autorización para aprobar/fusionar.
