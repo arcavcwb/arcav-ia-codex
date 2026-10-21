@@ -215,3 +215,23 @@ node bin/cli.js task verify TASK-001 --file backlog/tasks.json --repo . \
 Requiere Git, una rama diferente de `main`/`master`, un `main` local que permita calcular el ancestro común, una tarea `ready`, `in_progress` o `in_review`, riesgo no crítico y dependencias completadas. Evalúa el diff desde el ancestro común de `main`, archivos sin registrar, errores de whitespace (`git diff --check`), SHA-256 del diff y, bajo `--run-tests`, la salida de `npm test` con timeout. No lee secretos deliberadamente ni imprime el contenido completo del diff o los logs de pruebas. La revisión solo queda **solicitable** si se verificó un cambio real, no hay archivos sin registrar, no hay errores de formato y se ejecutaron pruebas satisfactoriamente.
 
 **Límites:** `npm test` ejecuta scripts definidos por el proyecto y puede tener efectos secundarios; utilízalo solo en repositorios confiables. Pasar estas verificaciones **no certifica** TDD RED-first ni revisión independiente y **nunca autoriza un merge**. No se ejecuta `codex`, ni se hacen `git add`, commits o push. Más información en [`docs/walkthroughs/task-quality-gate-mvp.md`](docs/walkthroughs/task-quality-gate-mvp.md).
+
+
+## Handoff de revisión independiente (incremento 7 · sin agentes)
+
+Después de modificar una rama de feature, construye un contrato de revisión a partir del diff y los resultados de QA. Por defecto, **no ejecuta pruebas ni incluye contenido de código**:
+
+```bash
+node bin/cli.js task review TASK-001 --file backlog/tasks.json --repo . --json
+```
+
+Para autorizar `npm test` y, opcionalmente, incluir el diff completo en el JSON (inspeccionar antes por posibles secretos):
+
+```bash
+node bin/cli.js task review TASK-001 --file backlog/tasks.json --repo . \
+  --run-tests --test-timeout-seconds 120 --include-diff --max-review-bytes 32768 --json
+```
+
+El handoff incluye la rama, `head_sha`, `base_sha`, SHA-256 del diff, archivos cambiados, resultado de `git diff --check`, pruebas ejecutadas y perfil sugerido de revisor independiente. Si fallan las comprobaciones o las pruebas no se han ejecutado, se bloquea la inclusión del diff. El límite del diff es **en bytes**, no en tokens. `--include-diff` solo se admite con un diff de texto y un QA aprobado; nunca se incluye el historial de conversación del implementador.
+
+**No se invoca Codex ni se certifica una revisión**: `independent_review_completed`, `tdd_red_proven` y `merge_approved` se mantienen en `false`. Los scripts de `npm test` pueden ejecutar código arbitrario y solo deben autorizarse en repositorios confiables. El revisor y el responsable humano deben analizar el código, los criterios y los posibles secretos. El CLI no crea commits ni modifica tareas. Detalles y límites: [`docs/walkthroughs/independent-review-handoff-mvp.md`](docs/walkthroughs/independent-review-handoff-mvp.md).
