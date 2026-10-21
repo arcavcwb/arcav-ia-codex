@@ -53,6 +53,7 @@ test('plan de revisión es de solo lectura, sesión efímera y sin historial del
   assert.ok(!p.argv.includes('workspace-write'));assert.ok(!p.argv.includes('resume'));
   assert.equal(p.max_total_tokens,8000);assert.equal(p.token_limit_is_hard,false);
   assert.equal(p.prompt.includes('historial del implementador'),false);
+  assert.deepEqual(p.argv.slice(0,3),['--ask-for-approval','never','exec']);
 });
 test('falla cerrado con QA incompleto, diff adulterado, riesgo crítico o modelo desconocido',()=>{
   const values=[
@@ -119,3 +120,26 @@ test('detecta cambios inesperados durante revisión',async()=>{
     assert.equal(r.status,'workspace_changed');assert.equal(r.review_completed,false);
   }finally{fs.rmSync(d,{recursive:true,force:true})}
 });
+
+
+// Regression: numeric CLI flags were mistakenly parsed with a literal \\d regexp.
+import { spawnSync } from 'node:child_process';
+const commandModule = new URL('../src/backlog/command.js', import.meta.url).href;
+test('review-run acepta límites numéricos válidos antes de validar el backlog', () => withDir(dir => {
+  const modelsFile = path.join(dir,'models.json');
+  const invalidBacklog = path.join(dir,'backlog.json');
+  fs.writeFileSync(modelsFile, JSON.stringify({luna:'model-1',sol:'model-2',astra:'model-3'}));
+  fs.writeFileSync(invalidBacklog, '{}');
+  const code = `import {runPlanningCommand} from ${JSON.stringify(commandModule)}; process.exit(await runPlanningCommand(process.argv.slice(1)));`;
+  for (const additionalArgs of [
+    ['--max-total-tokens','4000','--timeout-seconds','120'],
+    ['--max-total-tokens','4000','--timeout-seconds','120','--test-timeout-seconds','60','--max-review-bytes','32768'],
+  ]) {
+    const res = spawnSync(process.execPath,['--input-type=module','-e',code,'task','review-run','TASK-001',
+      '--file',invalidBacklog,'--repo',dir,'--models',modelsFile,
+      '--run-tests','--include-diff','--execute',...additionalArgs],{cwd:dir,encoding:'utf8'});
+    assert.equal(res.status,1);
+    assert.match(res.stderr,/Backlog inválido/);
+    assert.doesNotMatch(res.stderr,/requiere un entero positivo/);
+  }
+}));

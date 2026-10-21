@@ -58,8 +58,8 @@ export function planIndependentReview(handoff, { maxTotalTokens = 8000, timeoutS
     max_total_tokens: maxTotalTokens, timeout_seconds: timeoutSeconds,
     token_limit_is_hard: false, prompt_bytes: Buffer.byteLength(prompt, 'utf8'),
     command: 'codex',
-    argv: ['exec', '--model', model, '--sandbox', 'read-only', '--ask-for-approval', 'never',
-      '--ephemeral', '--json', '-'],
+    argv: ['--ask-for-approval', 'never', 'exec', '--model', model,
+      '--sandbox', 'read-only', '--ephemeral', '--json', '-'],
     prompt,
   };
 }
