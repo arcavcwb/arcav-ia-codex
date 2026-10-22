@@ -1,7 +1,7 @@
 {
   "name": "@arcav-ia/codex",
-  "version": "1.1.0",
-  "description": "Personal zero-dependency CLI to prepare repositories for OpenAI Codex with five agents and eight skills",
+  "version": "1.2.0",
+  "description": "Personal zero-dependency CLI that scaffolds repositories for OpenAI Codex (five agents, eight skills) and runs a deterministic backlog-to-review pipeline",
   "type": "module",
   "main": "src/index.js",
   "bin": {

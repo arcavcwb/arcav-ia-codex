@@ -1,5 +1,7 @@
 # Sprint Planner — incremento 3
 
+> **Desactualizado en parte (v1.2.0, 22-oct-2026):** en v1.2.0 el desempate entre tareas de igual prioridad usa orden natural del ID (`TASK-9` antes que `TASK-10`), sin depender del locale. Detalles en [codex-cli-pipeline-hardening.md](codex-cli-pipeline-hardening.md).
+
 ## Alcance
 
 Se agrega `sprint plan --file ruta --capacity N [--models ruta] [--json]`, herramienta determinista y sin escrituras ni ejecución de agentes.

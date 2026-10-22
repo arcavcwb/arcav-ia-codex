@@ -58,6 +58,10 @@ export async function scaffoldProject({ targetDir }) {
     'coverage/',
     'playwright-report/',
     'test-results/',
+    // El binario de impeccable (~16 MB) se copia para uso offline, pero no debe
+    // versionarse: el launcher sabe recuperarlo de ~/.impeccable, del PATH o
+    // descargarlo verificado con SHA-256.
+    '.agents/skills/impeccable/scripts/bin/',
   ]);
 
   if (injectDesignCheckScript(targetDir)) {

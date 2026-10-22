@@ -1,5 +1,7 @@
 # MVP 5 — Ejecutor piloto de una tarea
 
+> **Desactualizado en parte (v1.2.0, 22-oct-2026):** el `argv` de esta entrega ponía `--ask-for-approval never` después de `exec`, y Codex lo rechaza (`unexpected argument`); delante de `exec` se acepta, pero `codex exec` lo ignora. En v1.2.0 la política va como `-c approval_policy="never"` justo después de `exec`, y el CLI guarda el último `agent_message` del implementador en un archivo temporal privado (`report_file`), sin `--output-last-message`. Detalles en [codex-cli-pipeline-hardening.md](codex-cli-pipeline-hardening.md).
+
 ## Alcance
 
 Primera iteración de ejecución. `task run` mantiene `dry-run` por defecto; el opt-in `--execute` lanza **una sola sesión** de `codex exec`, sin shell y con sandbox `workspace-write`, aprobación `never` para impedir elevaciones de permisos no interactivas.

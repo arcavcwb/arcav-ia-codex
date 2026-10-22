@@ -1,5 +1,7 @@
 # Incremento 2 — PRD Markdown → Backlog JSON (MVP)
 
+> **Desactualizado en parte (v1.2.0, 22-oct-2026):** en v1.2.0 `backlog plan` genera una sola tarea TDD (RED → GREEN → REFACTOR) por criterio, sin dependencias, en lugar de una tarea de prueba más otra de implementación; además admite `#### Acceptance criteria`, trata como contexto las viñetas previas al encabezado de criterios, fusiona las sub-viñetas, avisa del texto tras una viñeta, excluye bloques de código y comentarios HTML, rechaza los que quedan sin cerrar e ignora los separadores. Detalles en [codex-cli-pipeline-hardening.md](codex-cli-pipeline-hardening.md).
+
 ## Alcance entregado
 
 - `src/backlog/prd.js`: parser acotado de Markdown (sin LLM), generador determinista de épicas/historias/tareas.

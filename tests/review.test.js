@@ -4,6 +4,7 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import { execFileSync, spawnSync } from 'node:child_process';
+import { createHash } from 'node:crypto';
 import { prepareIndependentReview } from '../src/execution/review.js';
 
 const oneTask = () => ({
@@ -14,24 +15,33 @@ const oneTask = () => ({
 });
 const backlog = () => ({schema_version:1,epics:[{id:'EP-001',title:'Calidad'}],stories:[{id:'US-001',epic_id:'EP-001',title:'Pruebas',acceptance_criteria:['Se valida entrada']}],tasks:[oneTask()]});
 const git = (dir,...args) => execFileSync('git',args,{cwd:dir,encoding:'utf8'}).trim();
-function fixture(fn) {
-  const dir=fs.mkdtempSync(path.join(os.tmpdir(),'arcav-review-'));
+// mainBranch permite simular repos cuya rama principal no es main (p. ej. master).
+function fixture(fn, { mainBranch = 'main' } = {}) {
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'arcav-review-'));
   try {
-    git(dir,'init','-b','main');git(dir,'config','user.name','Test');git(dir,'config','user.email','test@example.com');
-    fs.writeFileSync(path.join(dir,'package.json'),JSON.stringify({private:true,scripts:{test:'node smoke.cjs'}}));
-    fs.writeFileSync(path.join(dir,'smoke.cjs'),"process.exit(0);\n");
-    fs.writeFileSync(path.join(dir,'source.js'),'export const number = 1;\n');
-    fs.writeFileSync(path.join(dir,'backlog.json'),JSON.stringify(backlog()));
-    git(dir,'add','.');git(dir,'commit','-m','baseline');git(dir,'switch','-c','feat/review');
-    fs.writeFileSync(path.join(dir,'source.js'),'export const number = 2;\n');
+    git(dir, 'init', '-b', mainBranch);
+    git(dir, 'config', 'user.name', 'Test');
+    git(dir, 'config', 'user.email', 'test@example.com');
+    fs.writeFileSync(path.join(dir, 'package.json'), JSON.stringify({ private: true, scripts: { test: 'node smoke.cjs' } }));
+    fs.writeFileSync(path.join(dir, 'smoke.cjs'), 'process.exit(0);\n');
+    fs.writeFileSync(path.join(dir, 'source.js'), 'export const number = 1;\n');
+    fs.writeFileSync(path.join(dir, 'backlog.json'), JSON.stringify(backlog()));
+    git(dir, 'add', '.');
+    git(dir, 'commit', '-m', 'baseline');
+    git(dir, 'switch', '-c', 'feat/review');
+    fs.writeFileSync(path.join(dir, 'source.js'), 'export const number = 2;\n');
     return fn(dir);
-  } finally {fs.rmSync(dir,{recursive:true,force:true});}
+  } finally {
+    fs.rmSync(dir, { recursive: true, force: true });
+  }
 }
 
 test('handoff sin opt-in no ejecuta npm y no afirma revisión completada',()=>fixture(dir=>{
   const p=prepareIndependentReview(backlog(),'TASK-001',{repoRoot:dir});
   assert.equal(p.status,'blocked_awaiting_qa');
   assert.equal(p.qa.tests.executed,false);
+  assert.equal(p.qa.checks.worktree_unchanged_by_tests,null);
+  assert.equal(p.note,undefined);
   assert.equal(p.diff.included,false);
   assert.equal(p.review_contract.independent_review_completed,false);
   assert.equal(p.review_contract.merge_approved,false);
@@ -41,6 +51,8 @@ test('tests explícitos generan handoff sin historial de implementador',()=>fixt
   const p=prepareIndependentReview(backlog(),'TASK-001',{repoRoot:dir,runTests:true,models:{luna:'small',sol:'medium',astra:'large'}});
   assert.equal(p.status,'ready_for_independent_review');
   assert.equal(p.qa.checks.tests_passed,true);
+  assert.equal(p.qa.checks.worktree_unchanged_by_tests,true);
+  assert.equal(p.note,undefined);
   assert.ok(['luna','sol','astra'].includes(p.reviewer.tier));
   assert.equal(p.review_contract.implementer_conversation_included,false);
   assert.equal(p.review_contract.tdd_red_proven,false);
@@ -92,6 +104,80 @@ test('nunca ejecuta Codex y rechaza parámetros inválidos',()=>fixture(dir=>{
   assert.throws(()=>prepareIndependentReview(backlog(),'TASK-001',{repoRoot:dir,includeDiff:'yes'}),/boolean/);
   assert.throws(()=>prepareIndependentReview(backlog(),'TASK-001',{repoRoot:dir,maxReviewBytes:200000}),/maxReviewBytes/);
   assert.throws(()=>prepareIndependentReview(backlog(),'TASK-001',{repoRoot:dir,timeoutSeconds:0}),/timeoutSeconds/);
+}));
+
+test('handoff.qa.base_ref refleja la base usada por QA', () => fixture(dir => {
+  const handoff = prepareIndependentReview(backlog(), 'TASK-001', { repoRoot: dir });
+  assert.equal(handoff.qa.base_ref, 'main');
+  assert.equal(handoff.qa.base_sha, git(dir, 'rev-parse', 'main'));
+}));
+
+test('baseRef llega a QA en repos con rama principal master', () => fixture(dir => {
+  assert.throws(
+    () => prepareIndependentReview(backlog(), 'TASK-001', { repoRoot: dir }),
+    /No existe la referencia base 'main'/,
+  );
+  const handoff = prepareIndependentReview(backlog(), 'TASK-001', { repoRoot: dir, baseRef: 'master' });
+  assert.equal(handoff.qa.base_ref, 'master');
+  assert.equal(handoff.qa.base_sha, git(dir, 'rev-parse', 'master'));
+  assert.deepEqual(handoff.qa.changed_files, ['source.js']);
+}, { mainBranch: 'master' }));
+
+test('texto Latin-1: QA pasa, pero el diff no se incluye y no se confunde con un diff cambiado', () => fixture(dir => {
+  fs.writeFileSync(path.join(dir, 'source.js'), Buffer.from('export const name = "café";\n', 'latin1'));
+  const handoff = prepareIndependentReview(backlog(), 'TASK-001', { repoRoot: dir, runTests: true });
+  assert.equal(handoff.status, 'ready_for_independent_review');
+  assert.throws(
+    () => prepareIndependentReview(backlog(), 'TASK-001', { repoRoot: dir, runTests: true, includeDiff: true }),
+    { message: 'Diff con texto no UTF-8: revisar manualmente sin incluirlo en el handoff.' },
+  );
+}));
+
+test('texto que menciona cabeceras binarias se incluye en el handoff', () => fixture(dir => {
+  // En el diff estas líneas empiezan por '+', así que no son cabeceras de git.
+  fs.writeFileSync(path.join(dir, 'notes.md'), 'GIT binary patch\nBinary files a/x and b/x differ\n');
+  git(dir, 'add', 'notes.md');
+  const handoff = prepareIndependentReview(backlog(), 'TASK-001', { repoRoot: dir, runTests: true, includeDiff: true });
+  assert.equal(handoff.diff.included, true);
+  assert.match(handoff.diff.content, /^\+GIT binary patch$/m);
+  assert.match(handoff.diff.content, /^\+Binary files a\/x and b\/x differ$/m);
+  // El revisor vuelve a hashear el texto como UTF-8: debe producir los mismos bytes que QA.
+  assert.equal(createHash('sha256').update(handoff.diff.content, 'utf8').digest('hex'), handoff.qa.diff_sha256);
+}));
+
+test('un binario real (bytes NUL) sigue fuera del handoff', () => fixture(dir => {
+  fs.writeFileSync(path.join(dir, 'image.bin'), Buffer.from([0, 1, 2, 0, 255]));
+  git(dir, 'add', 'image.bin');
+  assert.throws(
+    () => prepareIndependentReview(backlog(), 'TASK-001', { repoRoot: dir, runTests: true, includeDiff: true }),
+    { message: 'Diff binario: revisar manualmente sin incluirlo en el handoff.' },
+  );
+}));
+
+test('npm test que crea un archivo no ignorado deja el handoff bloqueado y lo explica', () => fixture(dir => {
+  // npm test real que deja un informe sin registrar en la raíz del repositorio.
+  fs.writeFileSync(path.join(dir, 'smoke.cjs'), "require('node:fs').writeFileSync('test-report.xml', '<ok/>');\n");
+  const handoff = prepareIndependentReview(backlog(), 'TASK-001', { repoRoot: dir, runTests: true, includeDiff: true });
+  assert.equal(handoff.status, 'blocked_awaiting_qa');
+  assert.equal(handoff.qa.checks.tests_passed, true);
+  assert.equal(handoff.qa.checks.worktree_unchanged_by_tests, false);
+  assert.deepEqual(handoff.qa.tests.worktree_changes, { new_untracked_files: ['test-report.xml'], diff_changed: false });
+  assert.deepEqual(handoff.qa.untracked_files, ['test-report.xml']);
+  assert.equal(handoff.diff.included, false);
+  assert.match(handoff.note, /^npm test modificó el worktree: creó archivos sin registrar \(test-report\.xml\)\. /);
+  assert.doesNotMatch(handoff.note, /repetir/i);
+}));
+
+test('npm test que modifica un archivo rastreado deja el handoff bloqueado sin pedir repetir QA', () => fixture(dir => {
+  // npm test real y no idempotente: cada ejecución añade una marca de tiempo a un archivo rastreado.
+  fs.writeFileSync(path.join(dir, 'smoke.cjs'), "require('node:fs').appendFileSync('source.js', '// ' + Date.now() + '\\n');\n");
+  const handoff = prepareIndependentReview(backlog(), 'TASK-001', { repoRoot: dir, runTests: true, includeDiff: true });
+  assert.equal(handoff.status, 'blocked_awaiting_qa');
+  assert.equal(handoff.qa.checks.worktree_unchanged_by_tests, false);
+  assert.deepEqual(handoff.qa.tests.worktree_changes, { new_untracked_files: [], diff_changed: true });
+  assert.equal(handoff.diff.included, false);
+  assert.match(handoff.note, /^npm test modificó el worktree: cambió archivos rastreados\. /);
+  assert.doesNotMatch(handoff.note, /repetir/i);
 }));
 
 test('CLI task review es dry-run por defecto, y ejecuta QA con opt-in',()=>fixture(dir=>{

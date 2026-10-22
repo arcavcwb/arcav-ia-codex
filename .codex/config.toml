@@ -1,4 +1,4 @@
-model = "gpt-5.6"
+# model = "gpt-6.1-sol"  # opcional: fija un modelo disponible en tu cuenta (https://learn.chatgpt.com/docs/models)
 model_reasoning_effort = "medium"
 approval_policy = "on-request"
 sandbox_mode = "workspace-write"

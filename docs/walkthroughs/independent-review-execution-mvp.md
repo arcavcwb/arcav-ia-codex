@@ -1,5 +1,7 @@
 # MVP 8 — Revisión por agente independiente (opt-in)
 
+> **Desactualizado en parte (v1.2.0, 22-oct-2026):** en v1.2.0 la política de aprobación va como `-c approval_policy="never"` justo después de `exec`: el `--ask-for-approval never` global del punto 3 se acepta, pero `codex exec` lo ignora. El revisor añade `--output-schema` y `--output-last-message` y toma la respuesta de ese archivo o, si falta, del último `agent_message`, así que los mensajes previos ya no invalidan la revisión; acepta un único bloque de código markdown que envuelva todo el JSON, pero no texto antes o después. También respeta `--base`. Detalles en [codex-cli-pipeline-hardening.md](codex-cli-pipeline-hardening.md).
+
 ## Alcance
 
 `task review-run` conecta el handoff del MVP 7 con una sesión **nueva** de `codex exec` para un revisor de IA, bajo sandbox `read-only`. La sesión no utiliza el historial de conversación del implementador, no crea commits, no cambia el backlog, y **jamás aprueba un merge**.

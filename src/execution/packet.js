@@ -3,8 +3,8 @@ import path from 'node:path';
 import { TextDecoder } from 'node:util';
 import { validateBacklog } from '../backlog/validate.js';
 import { routeTask } from '../routing/router.js';
+import { LIMITS, inRange } from '../limits.js';
 
-const DEFAULT_MAX_CONTEXT_BYTES = 32 * 1024;
 const MAX_FILES = 12;
 const DENIED_SEGMENTS = new Set([
   '.git', '.ssh', '.env', '.npmrc', '.netrc', 'node_modules', 'secrets',
@@ -53,9 +53,10 @@ function readScopedFile(root, name, remaining) {
 }
 
 /** Paquete de handoff de solo lectura: ninguna llamada a Codex, shell, git ni red. */
-export function prepareTaskPacket(backlog, taskId, { repoRoot = process.cwd(), models = {}, maxContextBytes = DEFAULT_MAX_CONTEXT_BYTES } = {}) {
-  if (!Number.isSafeInteger(maxContextBytes) || maxContextBytes < 4096 || maxContextBytes > 131072) {
-    throw new Error('maxContextBytes: entero entre 4096 y 131072 bytes.');
+export function prepareTaskPacket(backlog, taskId, { repoRoot = process.cwd(), models = {}, maxContextBytes = LIMITS.maxContextBytes.default } = {}) {
+  if (!inRange(maxContextBytes, LIMITS.maxContextBytes)) {
+    const { min, max } = LIMITS.maxContextBytes;
+    throw new Error(`maxContextBytes: entero entre ${min} y ${max} bytes.`);
   }
   const validation = validateBacklog(backlog);
   if (!validation.valid) throw new Error(`Backlog inválido:\n- ${validation.errors.join('\n- ')}`);

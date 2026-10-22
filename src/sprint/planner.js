@@ -1,18 +1,21 @@
 import { validateBacklog } from '../backlog/validate.js';
 import { routeTask } from '../routing/router.js';
+import { LIMITS, inRange } from '../limits.js';
 
 /**
- * Select a deterministic ready-to-start frontier for a sprint, without changing
- * task statuses or invoking agents. Smaller tasks may fill capacity left by
- * higher-priority tasks that do not fit.
+ * Selecciona de forma determinista las tareas listas para un sprint, sin cambiar
+ * estados ni invocar agentes. Tareas menores pueden ocupar la capacidad que dejan
+ * libre las de mayor prioridad que no caben.
  *
- * Priority 1 is highest; omitted priority means 3 (backwards compatible).
- * Critical-risk tasks remain blocked until approval is represented explicitly
- * in a future contract; this MVP has no approval field to trust.
+ * Orden: prioridad (1 es la máxima; si falta, 3 por compatibilidad) y, a igual
+ * prioridad, orden natural del ID (TASK-9 antes que TASK-10).
+ * Las tareas de riesgo crítico siguen bloqueadas hasta que un contrato futuro
+ * represente la aprobación explícita; este MVP no tiene un campo fiable para ello.
  */
 export function planSprint(backlog, { capacity, models = {} } = {}) {
-  if (!Number.isSafeInteger(capacity) || capacity < 1 || capacity > 1000) {
-    throw new Error('capacity: se requiere un entero entre 1 y 1000 story points.');
+  if (!inRange(capacity, LIMITS.capacity)) {
+    const { min, max } = LIMITS.capacity;
+    throw new Error(`capacity: se requiere un entero entre ${min} y ${max} story points.`);
   }
   const validation = validateBacklog(backlog);
   if (!validation.valid) throw new Error(`Backlog inválido:\n- ${validation.errors.join('\n- ')}`);
@@ -45,7 +48,7 @@ export function planSprint(backlog, { capacity, models = {} } = {}) {
     candidates.push(task);
   }
 
-  candidates.sort((a,b) => (a.priority ?? 3) - (b.priority ?? 3) || a.id.localeCompare(b.id));
+  candidates.sort((a, b) => (a.priority ?? 3) - (b.priority ?? 3) || compareIds(a.id, b.id));
   for (const task of candidates) {
     const priority = task.priority ?? 3;
     if (used + task.story_points > capacity) {
@@ -63,4 +66,32 @@ export function planSprint(backlog, { capacity, models = {} } = {}) {
     selected, deferred, blocked, ignored,
     totals:{ selected:selected.length, deferred:deferred.length, blocked:blocked.length, ignored:ignored.length },
   };
+}
+
+// Orden natural determinista, sin ICU ni locale: compara trozos de dígitos y de
+// no dígitos; los numéricos por valor, sin convertirlos a Number (sin pérdida de precisión).
+function compareIds(a, b) {
+  const left = a.match(/\d+|\D+/g) ?? [];
+  const right = b.match(/\d+|\D+/g) ?? [];
+  const shared = Math.min(left.length, right.length);
+  for (let i = 0; i < shared; i++) {
+    const order = compareChunks(left[i], right[i]);
+    if (order !== 0) return order;
+  }
+  // Prefijo común: primero el más corto; "TASK-007" y "TASK-7" se desempatan por texto.
+  return left.length - right.length || compareCodeUnits(a, b);
+}
+
+function compareChunks(a, b) {
+  if (!/^\d/.test(a) || !/^\d/.test(b)) return compareCodeUnits(a, b);
+  const left = a.replace(/^0+/, '');
+  const right = b.replace(/^0+/, '');
+  // Sin ceros a la izquierda, más dígitos implica un número mayor.
+  return left.length - right.length || compareCodeUnits(left, right);
+}
+
+function compareCodeUnits(a, b) {
+  if (a < b) return -1;
+  if (a > b) return 1;
+  return 0;
 }

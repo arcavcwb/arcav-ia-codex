@@ -80,6 +80,35 @@ test('desempata por ID de forma reproducible y asigna prioridad 3 por defecto', 
   assert.equal(result.selected[0].priority,3);
 });
 
+test('a igual prioridad desempata por orden natural del ID (TASK-9 antes que TASK-10)', () => {
+  const ids = ['TASK-10', 'TASK-9', 'TASK-100', 'TASK-1'];
+  const result = planSprint(backlog(ids.map(id => task(id))), { capacity: 20 });
+  assert.deepEqual(result.selected.map(t => t.id), ['TASK-1', 'TASK-9', 'TASK-10', 'TASK-100']);
+});
+
+test('la prioridad manda sobre el orden natural del ID', () => {
+  const result = planSprint(backlog([task('TASK-9', { priority: 2 }), task('TASK-10', { priority: 1 })]), { capacity: 10 });
+  assert.deepEqual(result.selected.map(t => t.id), ['TASK-10', 'TASK-9']);
+});
+
+test('el orden natural no depende del orden de entrada ni pierde precisión con números grandes', () => {
+  // 9007199254740992 y 9007199254740993 son el mismo valor como Number.
+  assert.equal(Number('9007199254740993'), Number('9007199254740992'));
+  const ids = ['TASK-9007199254740993', 'TASK-10-B', 'TASK-7', 'TASK-9007199254740992', 'TASK-007', 'TASK-10-A'];
+  const expected = ['TASK-007', 'TASK-7', 'TASK-10-A', 'TASK-10-B', 'TASK-9007199254740992', 'TASK-9007199254740993'];
+  for (const order of [ids, [...ids].reverse()]) {
+    const result = planSprint(backlog(order.map(id => task(id))), { capacity: 100 });
+    assert.deepEqual(result.selected.map(t => t.id), expected);
+  }
+  // Aquí el sufijo contradice al número: un comparador basado en Number() empataría
+  // 992 y 993 y desempataría por "-A" < "-B", con 993-A primero.
+  const pair = ['TASK-9007199254740993-A', 'TASK-9007199254740992-B'];
+  for (const order of [pair, [...pair].reverse()]) {
+    const result = planSprint(backlog(order.map(id => task(id))), { capacity: 100 });
+    assert.deepEqual(result.selected.map(t => t.id), ['TASK-9007199254740992-B', 'TASK-9007199254740993-A']);
+  }
+});
+
 test('valida capacidad sin coerciones ni límites absurdos', () => {
   for (const capacity of [0,-1,1.5,NaN,'3',Infinity,1001,undefined]) {
     assert.throws(()=>planSprint(backlog([]),{capacity}),/capacity/);

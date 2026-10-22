@@ -4,6 +4,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import os from 'node:os';
 import { execFileSync, spawnSync } from 'node:child_process';
+import { createHash } from 'node:crypto';
 import { verifyTaskChanges } from '../src/execution/verify.js';
 
 const item = (changes = {}) => ({
@@ -20,13 +21,14 @@ const backlog = (task = item()) => ({
   stories: [{ id: 'US-001', epic_id: 'EP-001', title: 'Suma', acceptance_criteria: ['Suma correcta'] }],
   tasks: [task],
 });
-function inRepo(callback) {
+// mainBranch permite simular repos cuya rama principal no es main (p. ej. master).
+function inRepo(callback, { mainBranch = 'main' } = {}) {
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'arcav-qa-'));
   function git(...args) {
     return execFileSync('git', args, { cwd: dir, encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'] }).trim();
   }
   try {
-    git('init', '-q', '-b', 'main');
+    git('init', '-q', '-b', mainBranch);
     fs.mkdirSync(path.join(dir, 'src'));
     fs.writeFileSync(path.join(dir, 'src', 'add.js'), 'export const add = (a, b) => a + b;\n');
     git('add', '.');
@@ -48,6 +50,7 @@ test('inspecciona diff de la rama sin ejecutar npm por defecto', () => inRepo(({
   assert.equal(called, false);
   assert.equal(result.checks.diff_present, true);
   assert.equal(result.checks.tests_passed, null);
+  assert.equal(result.checks.worktree_unchanged_by_tests, null);
   assert.equal(result.ready_for_independent_review, false);
   assert.equal(result.merge_approved, false);
   assert.equal(result.tdd_red_proven, false);
@@ -66,6 +69,8 @@ test('opt-in ejecuta npm test sin shell y permite solicitar review, no merge', (
   assert.equal(command.opts.shell, false);
   assert.equal(command.opts.timeout, 120000);
   assert.equal(result.checks.tests_passed, true);
+  assert.equal(result.checks.worktree_unchanged_by_tests, true);
+  assert.equal('worktree_changes' in result.tests, false);
   assert.equal(result.ready_for_independent_review, true);
   assert.equal(result.merge_approved, false);
   assert.equal(result.independent_review_completed, false);
@@ -122,6 +127,126 @@ test('rechaza estado no apto, riesgo crítico y parámetros inválidos', () => i
   assert.throws(() => verifyTaskChanges(backlog(), 'TASK-001', { repoRoot: dir, runTests: 'true' }), /runTests/);
   assert.throws(() => verifyTaskChanges(backlog(), 'TASK-001', { repoRoot: path.join(dir, 'src') }), /raíz del repositorio/i);
 }));
+
+test('base por defecto main y base_ref en el resultado', () => inRepo(({ dir, git, source }) => {
+  fs.writeFileSync(source, 'export const add = (a, b) => a + b + 0;\n');
+  const result = verifyTaskChanges(backlog(), 'TASK-001', { repoRoot: dir });
+  assert.equal(result.base_ref, 'main');
+  assert.equal(result.base_sha, git('rev-parse', 'main'));
+}));
+
+test('repo con rama principal master: sin baseRef falla claro y con baseRef master verifica', () => inRepo(({ dir, git, source }) => {
+  fs.writeFileSync(source, 'export const add = (a, b) => a + b + 0;\n');
+  assert.throws(
+    () => verifyTaskChanges(backlog(), 'TASK-001', { repoRoot: dir }),
+    { message: "No existe la referencia base 'main'. Usa --base <rama> (por ejemplo master u origin/main)." },
+  );
+  const result = verifyTaskChanges(backlog(), 'TASK-001', { repoRoot: dir, baseRef: 'master' });
+  assert.equal(result.base_ref, 'master');
+  assert.equal(result.base_sha, git('rev-parse', 'master'));
+  assert.equal(result.checks.diff_present, true);
+  assert.deepEqual(result.changed_files, ['src/add.js']);
+}, { mainBranch: 'master' }));
+
+test('rechaza base igual a la rama actual y referencias base inválidas', () => inRepo(({ dir }) => {
+  assert.throws(
+    () => verifyTaskChanges(backlog(), 'TASK-001', { repoRoot: dir, baseRef: 'feat/qa' }),
+    { message: "La rama actual 'feat/qa' es la misma que la base del diff." },
+  );
+  for (const baseRef of ['-x', '../a', 'a..b']) {
+    assert.throws(
+      () => verifyTaskChanges(backlog(), 'TASK-001', { repoRoot: dir, baseRef }),
+      { message: `--base: referencia Git inválida: ${baseRef}.` },
+    );
+  }
+}));
+
+test('base sin ancestro común falla con mensaje claro, no con error crudo de git', () => inRepo(({ dir, git }) => {
+  git('switch', '-q', '--orphan', 'feat/huerfana');
+  git('-c', 'user.name=Arcav Test', '-c', 'user.email=arcav@example.test', 'commit', '-q', '--allow-empty', '-m', 'otra historia');
+  assert.throws(
+    () => verifyTaskChanges(backlog(), 'TASK-001', { repoRoot: dir }),
+    { message: "No se pudo determinar la base del diff respecto a 'main'." },
+  );
+}));
+
+test('archivo Latin-1: diff_sha256 es el SHA-256 de los bytes crudos de git diff', () => inRepo(({ dir, source }) => {
+  fs.writeFileSync(source, Buffer.from('export const name = "café";\n', 'latin1'));
+  const result = verifyTaskChanges(backlog(), 'TASK-001', { repoRoot: dir });
+  assert.equal(result.checks.diff_present, true);
+  const bytes = execFileSync('git', ['diff', '--no-ext-diff', '--binary', result.base_sha, '--'], { cwd: dir });
+  // El diff contiene el byte Latin-1 0xE9 tal cual, sin recodificar.
+  assert.ok(bytes.includes(0xe9));
+  assert.equal(result.diff_sha256, createHash('sha256').update(bytes).digest('hex'));
+  // El hash del texto decodificado (cálculo anterior) no coincide con el de los bytes.
+  assert.notEqual(result.diff_sha256, createHash('sha256').update(bytes.toString('utf8'), 'utf8').digest('hex'));
+}));
+
+test('npm test que crea un archivo no ignorado bloquea y el informe describe el estado posterior', () => inRepo(({ dir, source }) => {
+  fs.writeFileSync(source, 'export const add = (a, b) => a + b + 0;\n');
+  // Simula un npm test que deja un informe sin registrar en la raíz del repositorio.
+  const writesReport = (name, args, opts) => {
+    fs.writeFileSync(path.join(opts.cwd, 'test-report.xml'), '<ok/>\n');
+    return pass();
+  };
+  const result = verifyTaskChanges(backlog(), 'TASK-001', { repoRoot: dir, runTests: true, spawnTest: writesReport });
+  assert.equal(result.checks.tests_passed, true);
+  assert.equal(result.checks.worktree_unchanged_by_tests, false);
+  assert.deepEqual(result.tests.worktree_changes, { new_untracked_files: ['test-report.xml'], diff_changed: false });
+  assert.deepEqual(result.untracked_files, ['test-report.xml']);
+  assert.equal(result.checks.no_untracked_files, false);
+  assert.equal(result.ready_for_independent_review, false);
+}));
+
+test('npm test que modifica un archivo rastreado bloquea y diff_sha256 es el del estado posterior', () => inRepo(({ dir, source }) => {
+  fs.writeFileSync(source, 'export const add = (a, b) => a + b + 0;\n');
+  // Simula un npm test no idempotente que añade una marca de tiempo a un archivo rastreado.
+  const stamps = (name, args, opts) => {
+    fs.appendFileSync(path.join(opts.cwd, 'src', 'add.js'), `// ${Date.now()}\n`);
+    return pass();
+  };
+  const result = verifyTaskChanges(backlog(), 'TASK-001', { repoRoot: dir, runTests: true, spawnTest: stamps });
+  assert.equal(result.checks.worktree_unchanged_by_tests, false);
+  assert.deepEqual(result.tests.worktree_changes, { new_untracked_files: [], diff_changed: true });
+  assert.deepEqual(result.untracked_files, []);
+  const bytes = execFileSync('git', ['diff', '--no-ext-diff', '--binary', result.base_sha, '--'], { cwd: dir });
+  assert.equal(result.diff_sha256, createHash('sha256').update(bytes).digest('hex'));
+  assert.equal(result.ready_for_independent_review, false);
+}));
+
+test('npm test que borra un archivo sin registrar también cambia el worktree', () => inRepo(({ dir, source }) => {
+  fs.writeFileSync(source, 'export const add = (a, b) => a + b + 0;\n');
+  fs.writeFileSync(path.join(dir, 'fixture.json'), '{}\n');
+  // Los tests pasaron con fixture.json presente; tras borrarlo, el resto de checks sí pasaría.
+  const removesFixture = (name, args, opts) => {
+    fs.rmSync(path.join(opts.cwd, 'fixture.json'));
+    return pass();
+  };
+  const result = verifyTaskChanges(backlog(), 'TASK-001', { repoRoot: dir, runTests: true, spawnTest: removesFixture });
+  assert.deepEqual(result.tests.worktree_changes, {
+    new_untracked_files: [], diff_changed: false, removed_untracked_files: ['fixture.json'],
+  });
+  assert.equal(result.checks.no_untracked_files, true);
+  assert.equal(result.checks.worktree_unchanged_by_tests, false);
+  assert.equal(result.ready_for_independent_review, false);
+}));
+
+test('directorio sin repositorio Git falla con mensaje claro, no con el error crudo de git', () => {
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'arcav-qa-norepo-'));
+  // Evita que git encuentre un repositorio en un directorio padre del temporal.
+  const ceiling = process.env.GIT_CEILING_DIRECTORIES;
+  process.env.GIT_CEILING_DIRECTORIES = path.dirname(fs.realpathSync(dir));
+  try {
+    assert.throws(
+      () => verifyTaskChanges(backlog(), 'TASK-001', { repoRoot: dir }),
+      { message: `No se encontró un repositorio Git en ${fs.realpathSync(dir)}.` },
+    );
+  } finally {
+    if (ceiling === undefined) delete process.env.GIT_CEILING_DIRECTORIES;
+    else process.env.GIT_CEILING_DIRECTORIES = ceiling;
+    fs.rmSync(dir, { recursive: true, force: true });
+  }
+});
 
 test('CLI task verify inspecciona en dry-run y prueba npm solo con --run-tests', () => inRepo(({ dir, source }) => {
   fs.writeFileSync(source, 'export const add = (a, b) => a + b + 1;\n');
