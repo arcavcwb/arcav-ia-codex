@@ -10,12 +10,23 @@ export const colors = {
   blue: '\x1b[34m',
 };
 
+// Ancho interior de la caja del banner, sin los bordes.
+const BANNER_WIDTH = 63;
+
+/** Centra el texto dentro de la caja para que el borde derecho quede siempre alineado. */
+function bannerLine(text) {
+  const free = BANNER_WIDTH - [...text].length;
+  const left = Math.floor(free / 2);
+  return `║${' '.repeat(left)}${text}${' '.repeat(free - left)}║`;
+}
+
 export function showBanner() {
+  const border = '═'.repeat(BANNER_WIDTH);
   console.log(`
-${colors.cyan}${colors.bold}╔═══════════════════════════════════════════════════════════════╗
-║                    @arcav-ia/codex                            ║
-║              Personal Codex Development Toolkit                ║
-║           5 Codex Agents • 8 Skills • Git-First                ║
-╚═══════════════════════════════════════════════════════════════╝${colors.reset}
+${colors.cyan}${colors.bold}╔${border}╗
+${bannerLine('@arcav-ia/codex')}
+${bannerLine('Personal Codex Development Toolkit')}
+${bannerLine('Scaffolding Codex • Backlog → Revisión • Git-First')}
+╚${border}╝${colors.reset}
 `);
 }

@@ -1,5 +1,7 @@
 # MVP 7 — Handoff para revisión independiente
 
+> **Desactualizado en parte (v1.2.0, 22-oct-2026):** en v1.2.0 la base del diff es configurable con `--base <ref>` (por defecto `main`); `--include-diff` rechaza texto no UTF-8 y detecta binarios solo por las cabeceras de git; si `npm test` modifica el worktree, el handoff queda en `blocked_awaiting_qa` con una `note` que lo explica. Detalles en [codex-cli-pipeline-hardening.md](codex-cli-pipeline-hardening.md).
+
 ## Objetivo
 
 Preparar un paquete reproducible para un **revisor distinto del implementador** basado en criterios de aceptación y evidencia de QA, sin invocar agentes, sin aprobar automáticamente un merge y sin compartir el historial de la sesión que implementó el cambio.

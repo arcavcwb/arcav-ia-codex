@@ -19,3 +19,22 @@ jobs:
           node-version: ${{ matrix.node-version }}
       - name: Run tests
         run: npm test
+
+  # Contrato con el Codex CLI publicado: solo usa --version, --help y 'features list' (sin
+  # credenciales ni modelos). Sin versión fijada a propósito, para detectar cuando Codex
+  # cambie sus flags.
+  codex-contract:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Install Codex CLI
+        run: npm install -g @openai/codex
+      - name: Codex CLI contract
+        env:
+          CODEX_CONTRACT_REQUIRED: '1'
+        run: node --test tests/codex-contract.test.js

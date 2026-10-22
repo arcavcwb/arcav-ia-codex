@@ -1,5 +1,7 @@
 # Codex MVP
 
+> **Desactualizado en parte (v1.2.0, 22-oct-2026):** en v1.2.0 las plantillas ya no fijan modelos (`gpt-5.6` y `gpt-5.6-codex` no figuran como IDs en la página de modelos y `gpt-5.3-codex-spark` se retiró el 14-sep-2026) ni declaran `sandbox_mode` en los agentes, porque Codex no lo aplica desde un archivo de agente: el `reviewer` es de solo lectura por instrucción, no por sandbox. Detalles en [codex-cli-pipeline-hardening.md](codex-cli-pipeline-hardening.md).
+
 ## Cambios
 
 - Package convertido a `@arcav-ia/codex`.

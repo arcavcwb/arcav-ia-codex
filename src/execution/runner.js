@@ -1,24 +1,32 @@
 import fs from 'node:fs';
+import os from 'node:os';
 import path from 'node:path';
 import { spawn, execFileSync } from 'node:child_process';
-import { StringDecoder } from 'node:string_decoder';
+import { runCodexJsonl } from './codex-process.js';
+import { LIMITS, inRange } from '../limits.js';
 
 const VALID_MODEL = /^[a-zA-Z0-9][a-zA-Z0-9._:/-]{0,127}$/;
-const MAX_EVENT_BUFFER = 128 * 1024;
+// Mismo formato de ID que exige src/backlog/validate.js; forma parte del nombre del informe.
+const VALID_TASK_ID = /^[A-Z][A-Z0-9-]*$/;
+// Nombres propios del ejecutor para los estados comunes de codex-process.js.
+const STATUS_NAMES = { invalid_stream: 'invalid_telemetry', completed: 'completed_needs_review' };
 
 /** Plan determinista: ni procesos ni credenciales son usados en esta fase. */
-export function planTaskExecution(packet, { maxTotalTokens = 8000, timeoutSeconds = 300 } = {}) {
+export function planTaskExecution(packet, {
+  maxTotalTokens = LIMITS.maxTotalTokens.default,
+  timeoutSeconds = LIMITS.timeoutSeconds.default,
+} = {}) {
   if (packet?.execution !== 'dry-run' || !packet.task?.id || packet.task?.risk === 'critical' ||
       packet.routing?.requires_human_approval) throw new Error('Paquete inválido o tarea crítica bloqueada.');
   const model = packet.routing?.implementer?.model_id;
   if (typeof model !== 'string' || !VALID_MODEL.test(model)) {
     throw new Error('Debe configurar un model_id válido para el implementador (--models).');
   }
-  if (!Number.isSafeInteger(maxTotalTokens) || maxTotalTokens < 100 || maxTotalTokens > 100_000) {
-    throw new Error('maxTotalTokens debe ser entero de 100 a 100000.');
+  if (!inRange(maxTotalTokens, LIMITS.maxTotalTokens)) {
+    throw new Error(`maxTotalTokens debe ser entero de ${LIMITS.maxTotalTokens.min} a ${LIMITS.maxTotalTokens.max}.`);
   }
-  if (!Number.isSafeInteger(timeoutSeconds) || timeoutSeconds < 10 || timeoutSeconds > 3600) {
-    throw new Error('timeoutSeconds debe ser entero de 10 a 3600.');
+  if (!inRange(timeoutSeconds, LIMITS.timeoutSeconds)) {
+    throw new Error(`timeoutSeconds debe ser entero de ${LIMITS.timeoutSeconds.min} a ${LIMITS.timeoutSeconds.max}.`);
   }
   const prompt = JSON.stringify({
     task: packet.task,
@@ -35,7 +43,13 @@ export function planTaskExecution(packet, { maxTotalTokens = 8000, timeoutSecond
     budget_enforcement: 'best-effort: se comprueba al recibir eventos; no limita una llamada en curso',
     prompt_bytes: Buffer.byteLength(prompt, 'utf8'),
     command: 'codex',
-    argv: ['exec', '--model', model, '--sandbox', 'workspace-write', '--ask-for-approval', 'never', '--json', '-'],
+    // approval_policy va como override -c justo después de "exec", con comillas TOML: codex exec
+    // (0.163.0) ignora el flag global --ask-for-approval aunque vaya antes del subcomando.
+    // Sin --output-last-message: Codex escribiría el mensaje final, fuera del sandbox, en una
+    // ruta que los comandos del sandbox workspace-write pueden preparar (p. ej. con un symlink).
+    // El argv es el mismo en el dry-run y al ejecutar.
+    argv: ['exec', '-c', 'approval_policy="never"', '--model', model, '--sandbox', 'workspace-write', '--json', '-'],
+    final_message: 'Al terminar Codex, el CLI guarda su último agent_message en un archivo temporal privado; nunca se imprime.',
     prompt,
   };
 }
@@ -44,7 +58,14 @@ export function planTaskExecution(packet, { maxTotalTokens = 8000, timeoutSecond
 export function assertCleanFeatureBranch(repoRoot, { git = execFileSync } = {}) {
   const root = fs.realpathSync(repoRoot);
   const call = (...argv) => git('git', argv, {cwd:root,encoding:'utf8',stdio:['ignore','pipe','pipe']}).trim();
-  const top = fs.realpathSync(call('rev-parse','--show-toplevel'));
+  let topLevel;
+  try {
+    topLevel = call('rev-parse','--show-toplevel');
+  } catch (error) {
+    // Mensaje legible en lugar del error crudo "Command failed: git rev-parse ...".
+    throw new Error(`No se encontró un repositorio Git en ${root}.`, { cause: error });
+  }
+  const top = fs.realpathSync(topLevel);
   if (top !== root) throw new Error('Ejecute desde la raíz del repositorio Git.');
   const branch = call('branch','--show-current');
   if (!branch || branch === 'main' || branch === 'master') throw new Error('Se requiere una rama de feature; main/master están prohibidas.');
@@ -52,76 +73,91 @@ export function assertCleanFeatureBranch(repoRoot, { git = execFileSync } = {}) 
   return {root,branch,commit:call('rev-parse','HEAD')};
 }
 
+function removeDir(dir) {
+  try {
+    fs.rmSync(dir, { recursive: true, force: true });
+  } catch {
+    // Best effort: el directorio es privado y está en el temporal del sistema.
+  }
+}
+
+/**
+ * Guarda el mensaje final en un directorio temporal nuevo (0700), creado cuando Codex ya terminó.
+ * 'wx' (O_CREAT | O_EXCL) falla si la ruta ya existe, también como enlace simbólico o duro,
+ * así que nunca se escribe a través de un enlace plantado. Devuelve la ruta o el código de error.
+ */
+function saveReport(taskId, message, mkdtemp) {
+  if (!message) return { report_file: null };
+  let dir = null;
+  try {
+    dir = mkdtemp(path.join(os.tmpdir(), 'arcav-codex-'));
+    const file = path.join(dir, `${taskId}-mensaje-final.md`);
+    fs.writeFileSync(file, message, { flag: 'wx', mode: 0o600 });
+    return { report_file: file };
+  } catch (error) {
+    // rmSync no sigue enlaces: borra un enlace plantado, nunca su destino.
+    if (dir) removeDir(dir);
+    return { report_file: null, report_error: error?.code ?? 'WRITE' };
+  }
+}
+
+/** Ejecuta Codex y, cuando termina, guarda su último agent_message en un archivo privado. */
+async function runImplementer(plan, branch, { spawnImpl, mkdtemp }) {
+  let lastMessage = null;
+  const run = await runCodexJsonl({
+    argv: plan.argv,
+    prompt: plan.prompt,
+    cwd: branch.root,
+    timeoutSeconds: plan.timeout_seconds,
+    maxTotalTokens: plan.max_total_tokens,
+    spawnImpl,
+    onEvent: event => {
+      if (event.type === 'item.completed' && event.item?.type === 'agent_message') {
+        // Solo cuenta el último mensaje; si no trae texto, no hay mensaje final que guardar.
+        lastMessage = typeof event.item.text === 'string' ? event.item.text : null;
+      }
+      return true;
+    },
+  });
+  if (run.spawn_threw) {
+    return {
+      task_id: plan.task_id,
+      status: 'spawn_error',
+      error_code: run.error_code,
+      telemetry_complete: false,
+      report_file: null,
+    };
+  }
+  // Solo se devuelve la ruta: el contenido del modelo queda en disco para revisión humana.
+  const report = saveReport(plan.task_id, lastMessage, mkdtemp);
+  return {
+    task_id: plan.task_id,
+    status: STATUS_NAMES[run.status] ?? run.status,
+    model_id: plan.model_id,
+    exit_code: run.exit_code,
+    signal: run.signal,
+    branch: branch.branch,
+    usage: run.usage,
+    telemetry_complete: run.usage !== null && !run.stream_invalid,
+    max_total_tokens: plan.max_total_tokens,
+    token_limit_is_hard: false,
+    review_required: true,
+    ...report,
+    ...(run.error_code ? { error_code: run.error_code } : {}),
+  };
+}
+
 /** El ejecutor jamás muestra respuestas del modelo ni guarda el prompt en el resultado.
  * Inicia un único Codex no interactivo solo después de autorización CLI --execute.
+ * report_file es la ruta del último agent_message del implementador, que el CLI escribe cuando
+ * Codex termina, o null si no hubo mensaje o falló la escritura (report_error lleva el código).
+ * spawnImpl, git y mkdtemp (por defecto fs.mkdtempSync) se inyectan en los tests.
  */
-export function executeTaskPlan(plan, { repoRoot, spawnImpl = spawn, git = execFileSync } = {}) {
-  if (plan?.execution !== 'dry-run' || plan.command !== 'codex' || !Array.isArray(plan.argv)) {
+export function executeTaskPlan(plan, { repoRoot, spawnImpl = spawn, git = execFileSync, mkdtemp = fs.mkdtempSync } = {}) {
+  if (plan?.execution !== 'dry-run' || plan.command !== 'codex' || !Array.isArray(plan.argv) ||
+      plan.argv.at(-1) !== '-' || typeof plan.task_id !== 'string' || !VALID_TASK_ID.test(plan.task_id)) {
     throw new Error('Plan de ejecución inválido.');
   }
   const branch = assertCleanFeatureBranch(repoRoot, {git});
-  return new Promise(resolve => {
-    let child;
-    try {
-      child = spawnImpl('codex', plan.argv, {cwd:branch.root,shell:false,stdio:['pipe','pipe','pipe']});
-    } catch (error) {
-      resolve({task_id:plan.task_id,status:'spawn_error',error_code:error.code ?? 'SPAWN',telemetry_complete:false});
-      return;
-    }
-    const usage = {input_tokens:0,cached_input_tokens:0,output_tokens:0,total_tokens:0};
-    let observed = false, overBudget = false, timedOut = false, invalidStream = false;
-    let buffer='', streamBytes=0, stderrBytes=0, finished=false, escalationTimer=null;
-    const decoder = new StringDecoder('utf8');
-    function stop() {
-      if (escalationTimer || finished) return;
-      try {child.kill('SIGTERM');} catch {}
-      escalationTimer=setTimeout(()=>{if(!finished)try {child.kill('SIGKILL');} catch {}}, 2000);
-      escalationTimer.unref?.();
-    }
-    function ingest(line) {
-      if (!line.trim()) return;
-      let event;
-      try {event=JSON.parse(line);} catch {invalidStream=true;stop();return;}
-      if (event.type !== 'turn.completed') return;
-      const u=event.usage;
-      if (!u || !['input_tokens','output_tokens'].every(k=>Number.isSafeInteger(u[k])&&u[k]>=0)) {
-        invalidStream=true;stop();return;
-      }
-      observed=true;
-      usage.input_tokens += u.input_tokens;
-      usage.output_tokens += u.output_tokens;
-      usage.cached_input_tokens += Number.isSafeInteger(u.cached_input_tokens) ? u.cached_input_tokens : 0;
-      usage.total_tokens += u.input_tokens + u.output_tokens;
-      if (usage.total_tokens > plan.max_total_tokens) {overBudget=true;stop();}
-    }
-    child.stdout?.on('data', chunk => {
-      const s=decoder.write(chunk);streamBytes+=chunk.length;
-      if (streamBytes > 2_000_000) {invalidStream=true;stop();return;}
-      buffer+=s;
-      let index;
-      while ((index=buffer.indexOf('\n'))>=0) {
-        const line=buffer.slice(0,index);buffer=buffer.slice(index+1);
-        if (Buffer.byteLength(line)>MAX_EVENT_BUFFER) {invalidStream=true;stop();return;}
-        ingest(line);
-      }
-      if (Buffer.byteLength(buffer)>MAX_EVENT_BUFFER) {invalidStream=true;stop();}
-    });
-    child.stderr?.on('data', chunk => {stderrBytes+=chunk.length; if(stderrBytes>1_000_000){invalidStream=true;stop();}});
-    const timer=setTimeout(()=>{timedOut=true;stop();}, plan.timeout_seconds*1000);
-    timer.unref?.();
-    const finish = (code, signal, errorCode=null) => {
-      if(finished)return;finished=true;clearTimeout(timer);if(escalationTimer)clearTimeout(escalationTimer);
-      buffer+=decoder.end();
-      if(buffer.trim() && !invalidStream) ingest(buffer);
-      const status=errorCode ? 'spawn_error' : timedOut?'timeout':invalidStream?'invalid_telemetry':overBudget?'budget_exceeded':code!==0?'codex_failed':!observed?'telemetry_missing':'completed_needs_review';
-      resolve({task_id:plan.task_id,status,model_id:plan.model_id,exit_code:code,signal,
-        branch:branch.branch,usage:observed?usage:null,telemetry_complete:observed&&!invalidStream,
-        max_total_tokens:plan.max_total_tokens,token_limit_is_hard:false,
-        review_required:true, ...(errorCode?{error_code:errorCode}:{})});
-    };
-    child.on('error', err=>finish(null,null,err.code ?? 'SPAWN'));
-    child.on('close',(code,signal)=>finish(code,signal));
-    child.stdin?.on('error',()=>{});
-    child.stdin?.end(plan.prompt);
-  });
+  return runImplementer(plan, branch, { spawnImpl, mkdtemp });
 }

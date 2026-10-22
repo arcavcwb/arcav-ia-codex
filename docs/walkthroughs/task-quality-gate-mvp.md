@@ -1,5 +1,7 @@
 # MVP 6 — Verificación local de cambios por tarea
 
+> **Desactualizado en parte (v1.2.0, 22-oct-2026):** en v1.2.0 la base del diff es configurable con `--base <ref>` (por defecto `main`), el SHA-256 se calcula sobre los bytes crudos del diff y `ready_for_independent_review` exige además que `npm test` no modifique el worktree (`worktree_unchanged_by_tests`). Detalles en [codex-cli-pipeline-hardening.md](codex-cli-pipeline-hardening.md).
+
 ## Objetivo
 
 Transformar una ejecución que solicita revisión humana en un informe de QA reproducible sin consumir tokens de IA. El módulo inspecciona Git y ejecuta el test suite **solo bajo autorización explícita**.
