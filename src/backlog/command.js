@@ -57,7 +57,7 @@ export async function runPlanningCommand(args) {
       const numeric = (key, fallback) => {
         const value = options[key];
         if (value === null) return fallback;
-        if (!/^\\d+$/.test(value)) throw new Error(`--${key} requiere un entero positivo.`);
+        if (!/^\d+$/.test(value)) throw new Error(`--${key} requiere un entero positivo.`);
         return Number(value);
       };
       const repoRoot = options.repo ?? process.cwd();
