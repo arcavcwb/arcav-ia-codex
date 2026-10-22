@@ -1,0 +1,47 @@
+{
+  "schema_version": 1,
+  "epics": [
+    {
+      "id": "EP-901",
+      "title": "Validación del revisor independiente"
+    }
+  ],
+  "stories": [
+    {
+      "id": "US-901",
+      "epic_id": "EP-901",
+      "title": "Documentar garantías reales del presupuesto",
+      "acceptance_criteria": [
+        "La documentación explica que max-total-tokens es un presupuesto orientativo y no un límite duro de consumo o facturación"
+      ]
+    }
+  ],
+  "tasks": [
+    {
+      "id": "TASK-901",
+      "story_id": "US-901",
+      "title": "Comprobar precisión de documentación de tokens",
+      "description": "Revisar un cambio documental y detectar afirmaciones que contradigan las garantías reales de presupuesto del ejecutor.",
+      "acceptance_criteria": [
+        "Ningún texto garantiza que el límite de tokens nunca se supere",
+        "La documentación comunica que el consumo observado puede superar el límite antes de recibir telemetría"
+      ],
+      "test_plan": [
+        "npm test",
+        "Revisión independiente del diff contra los criterios de aceptación"
+      ],
+      "dependencies": [],
+      "status": "in_review",
+      "story_points": 1,
+      "priority": 3,
+      "risk": "low",
+      "complexity": {
+        "scope": 0,
+        "ambiguity": 0,
+        "integration": 0,
+        "impact": 0,
+        "verification": 1
+      }
+    }
+  ]
+}
