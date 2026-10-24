@@ -26,30 +26,30 @@ Primero, aprobar las tareas del backlog y crear worktree TASK-001; después escr
 
 ### 1. Publicar (dry-run por defecto)
 
-\`\`\`bash
+```bash
 node bin/cli.js coord contract publish TASK-001 --repo . \
   --file /ruta/backlog.json --path docs/contracts/customer-search.json --json
 
 node bin/cli.js coord contract publish TASK-001 --repo . \
   --file /ruta/backlog.json --path docs/contracts/customer-search.json --execute --json
-\`\`\`
+```
 
 Publicar marca el contrato **proposed**, no approved.
 
 ### 2. Revisar y aprobar una versión de forma explícita
 
-\`\`\`bash
+```bash
 node bin/cli.js coord contract show CustomerSearchAPI --repo . --version 1 --json
 
 node bin/cli.js coord contract approve CustomerSearchAPI --repo . --version 1 --json
 node bin/cli.js coord contract approve CustomerSearchAPI --repo . --version 1 --execute --json
-\`\`\`
+```
 
 **No hay autenticación de identidad en este MVP.** La aprobación es una acción local explícita del operador, no una firma criptográfica ni una demostración de que un humano concreto revisó el contrato. Mantener el control del acceso al repositorio y no conceder esa operación a agentes.
 
 ### 3. Preguntar y responder sin leer el directorio del otro agente
 
-\`\`\`bash
+```bash
 node bin/cli.js coord request open TASK-002 --repo . --file /ruta/backlog.json \
   --to TASK-001 --contract CustomerSearchAPI --version 1 \
   --question "¿Qué error devuelve un cliente no encontrado?" --execute --json
@@ -60,7 +60,7 @@ node bin/cli.js coord request answer REQ-000001 --repo . --from TASK-001 \
   --text "HTTP 200 con array de clientes vacío." --execute --json
 
 node bin/cli.js coord inbox show TASK-002 --repo . --json
-\`\`\`
+```
 
 Solo se permiten solicitudes del consumidor declarado al productor especificado. Una solicitud no se puede responder dos veces. El CLI valida IDs y relaciones declaradas, pero **no autentica** que la persona o proceso que escribe --from es el agente real.
 

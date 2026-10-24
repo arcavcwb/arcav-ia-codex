@@ -27,6 +27,16 @@ export function runCoordinationCommand(args) {
     const [group,op,id,...raw]=args,o=options(raw);
     if(!id||id.startsWith('--'))throw new Error('coord: se requiere ID.');
     const readBacklog=()=>JSON.parse(fs.readFileSync(path.resolve(o.file),'utf8'));
+    const allowed=(group==='contract'&&op==='publish')?['repo','json','execute','file','path']:
+      (group==='contract'&&op==='approve')?['repo','json','execute','version']:
+      (group==='contract'&&op==='show')?['repo','json','version','execute']:
+      (group==='contract'&&op==='list')?['repo','json','execute']:
+      (group==='request'&&op==='open')?['repo','json','execute','file','to','contract','version','question']:
+      (group==='request'&&op==='answer')?['repo','json','execute','from','text']:
+      ['repo','json','execute'];
+    for(const [key,value] of Object.entries(o)) {
+      if(!allowed.includes(key) && value!==false)throw new Error('coord: --'+key+' no se permite en '+op);
+    }
     let result;
     if(group==='contract'&&op==='publish') {
       if(!o.file||!o.path)throw new Error('coord contract publish exige --file y --path.');
@@ -54,16 +64,6 @@ export function runCoordinationCommand(args) {
       if(o.execute)throw new Error('coord inbox es de sólo lectura.');
       result=inbox(o.repo,id);
     }else throw new Error('Uso: coord contract publish|approve|show|list, request open|answer, inbox show.');
-    const allowed=(group==='contract'&&op==='publish')?['repo','json','execute','file','path']:
-      (group==='contract'&&op==='approve')?['repo','json','execute','version']:
-      (group==='contract'&&op==='show')?['repo','json','version','execute']:
-      (group==='contract'&&op==='list')?['repo','json','execute']:
-      (group==='request'&&op==='open')?['repo','json','execute','file','to','contract','version','question']:
-      (group==='request'&&op==='answer')?['repo','json','execute','from','text']:
-      ['repo','json','execute'];
-    for(const [key,value] of Object.entries(o)) {
-      if(!allowed.includes(key) && value!==false)throw new Error('coord: --'+key+' no se permite en '+op);
-    }
     if(o.json)console.log(JSON.stringify(result,null,2));
     else console.log('coord '+group+' '+op+': '+JSON.stringify(result));
     return 0;

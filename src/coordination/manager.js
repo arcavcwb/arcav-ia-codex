@@ -181,7 +181,11 @@ export function publishContract(repoRoot,backlog,input) {
     const all=state.contracts.filter(c=>c.id===proposed.contract_id);
     const expected=all.length?Math.max(...all.map(c=>c.version))+1:1;
     if(proposed.version!==expected)throw new Error('coord: versión concurrente; repetir preflight.');
-    state.contracts.push({...proposed,execution:undefined,operation:undefined,requires_execute:undefined});
+    state.contracts.push({id:proposed.contract_id,version:proposed.version,
+      producer_task_id:proposed.producer_task_id,consumer_task_ids:proposed.consumer_task_ids,
+      kind:data.definition.kind,summary:data.definition.summary,
+      commit_sha:proposed.commit_sha,path:proposed.path,content_sha256:proposed.content_sha256,
+      status:'proposed',published_at:new Date().toISOString()});
     event(state,'contract.published',{contract_id:proposed.contract_id,version:proposed.version,
       task_id:proposed.producer_task_id});
     return {...proposed,execution:'executed'};
