@@ -75,8 +75,13 @@ export function verifyTaskChanges(backlog, taskId, {
   };
   if (runTests) {
     // Intentionally explicit: npm scripts can run arbitrary project code.
+    // Node's test runner sets NODE_TEST_CONTEXT=child-v8. Passing it to a nested
+    // `npm test` can make `node --test` skip all test files yet exit with code 0.
+    // Remove only this runner-internal variable, preserving all other env keys.
+    const testEnv={...process.env};
+    delete testEnv.NODE_TEST_CONTEXT;
     const execution = spawnTest('npm', ['test'], {
-      cwd: root, encoding: 'utf8', shell: false, timeout: timeoutSeconds * 1000,
+      cwd: root, env:testEnv, encoding: 'utf8', shell: false, timeout: timeoutSeconds * 1000,
       maxBuffer: MAX_TEST_OUTPUT, stdio: ['ignore', 'pipe', 'pipe'],
     });
     tests.executed = true;
