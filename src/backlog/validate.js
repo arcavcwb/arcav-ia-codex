@@ -91,6 +91,40 @@ export function validateBacklog(backlog) {
     }
   }
 
+  // V2 adds traceability while keeping V1 backlogs valid unchanged.
+  if (backlog.planning?.strategy === 'coherent_v2') {
+    if (backlog.planning.review_required !== true) errors.push('planning.review_required: V2 exige revisión humana.');
+    const required = new Set(stories.filter(record).flatMap(s =>
+      Array.isArray(s.acceptance_criteria)
+        ? s.acceptance_criteria.map((_,i)=>`${s.id}:AC-${String(i+1).padStart(3,'0')}`)
+        : []));
+    const byStory = new Map(stories.filter(record).map(s=>[s.id,s]));
+    const covered = new Set();
+    for (const [i, task] of tasks.entries()) {
+      if (!record(task)) continue;
+      const label = `tasks[${i}].requirement_refs`;
+      if (!Array.isArray(task.requirement_refs) || !task.requirement_refs.length) {
+        errors.push(`${label}: V2 exige al menos un criterio trazable.`);
+        continue;
+      }
+      for (const [position, ref] of task.requirement_refs.entries()) {
+        if (typeof ref !== 'string' || !required.has(ref) || !ref.startsWith(`${task.story_id}:`)) {
+          errors.push(`${label}: referencia inválida o ajena a la historia: ${String(ref)}.`);
+          continue;
+        }
+        const index = Number(ref.slice(ref.lastIndexOf(':AC-') + 4)) - 1;
+        if (task.acceptance_criteria?.[position] !== byStory.get(task.story_id)?.acceptance_criteria?.[index]) {
+          errors.push(`${label}: texto del criterio no coincide con la fuente ${ref}.`);
+        }
+        if (covered.has(ref)) errors.push(`${label}: cobertura duplicada ${ref}.`);
+        covered.add(ref);
+      }
+      if (Array.isArray(task.acceptance_criteria) && task.acceptance_criteria.length !== task.requirement_refs.length) {
+        errors.push(`${label}: debe existir una referencia por criterio de la tarea.`);
+      }
+    }
+    for (const ref of required) if (!covered.has(ref)) errors.push(`planning: criterio sin cobertura ${ref}.`);
+  }
   // Las tareas READY no pueden declararse ejecutables si una dependencia sigue pendiente.
   const byId = new Map(tasks.filter(record).filter(t => filled(t.id)).map(t => [t.id, t]));
   for (const item of tasks.filter(record)) {
