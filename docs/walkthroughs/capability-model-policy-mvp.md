@@ -9,7 +9,7 @@ Backend, SDK y arquitectura mantienen Codex como ejecutor preferido. QA guiado p
 ## CLI — routing consultivo
 
 ```bash
-node bin/cli.js capability route TASK-001 \
+node bin/cli.js capability route TASK-002 \
   --file docs/examples/backlog.example.json \
   --role frontend \
   --policy docs/examples/capability-policy.json --json
