@@ -1,0 +1,114 @@
+{
+  "schema_version": 1,
+  "intent": "capability-routing-plan-only",
+  "roles": {
+    "frontend": {
+      "preferred": {
+        "executor": "antigravity",
+        "model_family": "claude-sonnet"
+      },
+      "escalation": [
+        {
+          "trigger": "verified_quality_failure",
+          "executor": "antigravity",
+          "model_family": "claude-opus"
+        },
+        {
+          "trigger": "provider_unavailable",
+          "executor": "codex",
+          "model_family": "codex"
+        }
+      ],
+      "independent_review": {
+        "executor": "codex",
+        "model_family": "codex"
+      }
+    },
+    "backend": {
+      "preferred": {
+        "executor": "codex",
+        "model_family": "codex"
+      },
+      "escalation": [
+        {
+          "trigger": "verified_quality_failure",
+          "executor": "codex",
+          "model_family": "codex-advanced"
+        },
+        {
+          "trigger": "provider_unavailable",
+          "executor": "opencode",
+          "model_family": "locally-configured"
+        }
+      ],
+      "independent_review": {
+        "executor": "antigravity",
+        "model_family": "claude-sonnet"
+      }
+    },
+    "sdk": {
+      "preferred": {
+        "executor": "codex",
+        "model_family": "codex"
+      },
+      "escalation": [
+        {
+          "trigger": "verified_quality_failure",
+          "executor": "codex",
+          "model_family": "codex-advanced"
+        },
+        {
+          "trigger": "provider_unavailable",
+          "executor": "opencode",
+          "model_family": "locally-configured"
+        }
+      ],
+      "independent_review": {
+        "executor": "antigravity",
+        "model_family": "claude-sonnet"
+      }
+    },
+    "architect": {
+      "preferred": {
+        "executor": "codex",
+        "model_family": "codex"
+      },
+      "escalation": [
+        {
+          "trigger": "verified_quality_failure",
+          "executor": "codex",
+          "model_family": "codex-advanced"
+        }
+      ],
+      "independent_review": {
+        "executor": "antigravity",
+        "model_family": "claude-sonnet"
+      }
+    },
+    "qa": {
+      "preferred": {
+        "executor": "antigravity",
+        "model_family": "gemini"
+      },
+      "escalation": [
+        {
+          "trigger": "provider_unavailable",
+          "executor": "codex",
+          "model_family": "codex"
+        }
+      ],
+      "independent_review": {
+        "executor": "codex",
+        "model_family": "codex"
+      }
+    }
+  },
+  "rules": {
+    "no_automatic_fallback": true,
+    "require_explicit_model_id": true,
+    "require_provider_auth_check": true,
+    "require_atomic_budget_admission": true,
+    "require_deterministic_tests": true,
+    "require_human_merge": true
+  }
+}

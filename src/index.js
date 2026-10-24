@@ -9,6 +9,7 @@ import { runWorktreeCommand } from './worktree/command.js';
 import { runBudgetCommand } from './budget/command.js';
 import { runSchedulerCommand } from './scheduler/command.js';
 import { runCoordinationCommand } from './coordination/command.js';
+import { runCapabilityCommand } from './capabilities/command.js';
 
 export async function main() {
   const args = process.argv.slice(2);
@@ -46,6 +47,7 @@ ${colors.bold}COMANDOS & EJEMPLOS:${colors.reset}
   npx @arcav-ia/codex budget status --repo . --policy budget-policy.json --json
   npx @arcav-ia/codex scheduler dispatch TASK-001 --file backlog/tasks.json --repo . --models modelos.json --policy presupuesto.json --run-id intento-001 --max-total-tokens 4000 --timeout-seconds 120 --json
   npx @arcav-ia/codex coord contract list all --repo . --json
+  npx @arcav-ia/codex capability route TASK-001 --file backlog/tasks.json --role frontend --policy docs/examples/capability-policy.json --json
 
 ${colors.bold}OPCIONES:${colors.reset}
   --doctor, --check-env            Ejecuta únicamente el diagnóstico de salud
@@ -53,6 +55,10 @@ ${colors.bold}OPCIONES:${colors.reset}
   -h, --help                       Muestra esta ayuda
 `);
     process.exit(0);
+  }
+
+  if (args[0] === 'capability') {
+    process.exit(runCapabilityCommand(args.slice(1)));
   }
 
   if (args[0] === 'coord') {
