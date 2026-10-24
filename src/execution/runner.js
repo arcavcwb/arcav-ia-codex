@@ -35,7 +35,7 @@ export function planTaskExecution(packet, { maxTotalTokens = 8000, timeoutSecond
     budget_enforcement: 'best-effort: se comprueba al recibir eventos; no limita una llamada en curso',
     prompt_bytes: Buffer.byteLength(prompt, 'utf8'),
     command: 'codex',
-    argv: ['exec', '--model', model, '--sandbox', 'workspace-write', '--ask-for-approval', 'never', '--json', '-'],
+    argv: ['--ask-for-approval', 'never', 'exec', '--model', model, '--sandbox', 'workspace-write', '--json', '-'],
     prompt,
   };
 }
