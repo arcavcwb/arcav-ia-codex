@@ -42,8 +42,10 @@ test('genera fixture sintético, Git limpio y sin credentials ni modelo ejecutab
   assert.equal(fs.existsSync(f.repo_dir+'.worktrees'),false);
   assert.equal(fs.existsSync(budgetPaths(f.repo_dir).dir),false);
   assert.ok(!fs.existsSync(path.join(f.repo_dir,'.env')));
+  const baselineEnv={...process.env};
+  delete baselineEnv.NODE_TEST_CONTEXT; // prevent recursive node:test from skipping the fixture
   const initial=spawnSync(process.execPath,['--test','test/customer.test.js'],{
-    cwd:f.repo_dir,encoding:'utf8',shell:false});
+    cwd:f.repo_dir,encoding:'utf8',shell:false,env:baselineEnv});
   assert.notEqual(initial.status,0,'TDD RED baseline must fail');
   assert.equal(b.tasks[0].status,'ready');
   assert.deepEqual(b.tasks[0].context_files,['src/customer.js','test/customer.test.js','package.json']);
@@ -96,4 +98,22 @@ test('no sobrescribe destino ya existente con datos de otro usuario',()=>temp(d=
   fs.writeFileSync(path.join(occupied,'keep.txt'),'KEEP');
   assert.throws(()=>createPilotFixture({directory:occupied}),/EEXIST/);
   assert.equal(fs.readFileSync(path.join(occupied,'keep.txt'),'utf8'),'KEEP');
+}));
+
+test('QA no hereda NODE_TEST_CONTEXT y verifica realmente la suite RED',()=>temp(d=>{
+  const f=createPilotFixture({directory:path.join(d,'pilot')});
+  const wt=createTaskWorktree(f.repo_dir,'TASK-901');
+  const old=process.env.NODE_TEST_CONTEXT;
+  try {
+    process.env.NODE_TEST_CONTEXT='child-v8';
+    const report=verifyTaskChanges(input(f).backlog,'TASK-901',{
+      repoRoot:wt.target,runTests:true,timeoutSeconds:60});
+    assert.equal(report.tests.executed,true);
+    assert.notEqual(report.tests.exit_code,0,'the initial RED fixture must fail');
+    assert.equal(report.checks.tests_passed,false);
+    assert.equal(report.ready_for_independent_review,false);
+  } finally {
+    if(old===undefined)delete process.env.NODE_TEST_CONTEXT;
+    else process.env.NODE_TEST_CONTEXT=old;
+  }
 }));
