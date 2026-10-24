@@ -21,7 +21,8 @@ function inspect(input){
   if(route.reason.some(r=>r!=='provider_and_model_require_validation')){
     throw new Error('antigravity: tarea no apta: '+route.reason.join(', '));
   }
-  if(typeof modelSlug!=='string'||!/^(?:claude.*sonnet|sonnet.*claude)$/i.test(modelSlug)){
+  if(typeof modelSlug!=='string'||!modelSlug.toLowerCase().includes('claude')||
+    !modelSlug.toLowerCase().includes('sonnet')||modelSlug.toLowerCase().includes('opus')){
     throw new Error('antigravity: slug frontend debe ser Claude Sonnet de agy models.');
   }
   if(budgetPolicy?.provider!=='antigravity')throw new Error('antigravity: se requiere budget provider=antigravity.');
