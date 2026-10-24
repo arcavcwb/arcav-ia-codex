@@ -1,0 +1,21 @@
+{
+  "schema_version": 1,
+  "id": "CustomerSearchAPI",
+  "version": 1,
+  "producer_task_id": "TASK-001",
+  "consumer_task_ids": [
+    "TASK-002"
+  ],
+  "kind": "api",
+  "summary": "Contrato explícito de búsqueda de clientes por nombre.",
+  "definition": {
+    "method": "GET",
+    "path": "/clientes",
+    "query": {
+      "search": "string"
+    },
+    "response": {
+      "clientes": "array"
+    }
+  }
+}
