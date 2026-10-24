@@ -23,8 +23,8 @@ const dateMS = value => {
 
 /** This is an internal admission policy, NOT an official provider quota or a billing limit. */
 export function validateBudgetPolicy(value) {
-  if (!isObject(value) || value.schema_version !== 1 || value.provider !== 'codex') {
-    throw new Error('budget: política v1 debe declarar provider=codex.');
+  if (!isObject(value) || value.schema_version !== 1 || !['codex','antigravity'].includes(value.provider)) {
+    throw new Error('budget: política v1 debe declarar provider=codex o antigravity.');
   }
   const keys=['schema_version','provider','window_hours','token_budget','threshold_pct','max_in_flight'];
   for(const key of Object.keys(value)) if (!keys.includes(key)) throw new Error('budget: campo desconocido '+key);
@@ -77,7 +77,7 @@ function readLedger(paths) {
   const seen=new Set();
   for(const row of ledger.entries) {
     if (!isObject(row) || !RUN_ID.test(row.run_id??'') || seen.has(row.run_id) ||
-        !TASK_ID.test(row.task_id??'') || row.provider!=='codex' ||
+        !TASK_ID.test(row.task_id??'') || !['codex','antigravity'].includes(row.provider) ||
         !['implementation','review'].includes(row.kind) ||
         !['reserved','settled'].includes(row.status)) {
       throw new Error('budget: registro inválido o duplicado; se bloquean nuevas reservas.');
@@ -125,14 +125,19 @@ function summarize(ledger,policy,time) {
   const cutoff=Date.parse(time)-policy.window_hours*3600000;
   let used=0,reserved=0,active=0,estimated=0;
   for(const entry of ledger.entries) {
-    if (entry.status==='reserved') {reserved+=entry.reserved_tokens;active++;continue;}
+    if (entry.status==='reserved') {
+      active++; // shared maximum in flight across providers in the same Git repo
+      if (entry.provider===policy.provider) reserved+=entry.reserved_tokens;
+      continue;
+    }
+    if(entry.provider!==policy.provider) continue;
     if(dateMS(entry.settled_at)>=cutoff) {
       used+=entry.accounted_tokens;
       if(entry.source==='estimated') estimated++;
     }
   }
   const cap=Math.floor(policy.token_budget*policy.threshold_pct/100);
-  return {provider:'codex',window_hours:policy.window_hours,token_budget:policy.token_budget,
+  return {provider:policy.provider,window_hours:policy.window_hours,token_budget:policy.token_budget,
     threshold_pct:policy.threshold_pct,cap_tokens:cap,used_tokens:used,
     reserved_tokens:reserved,active_runs:active,max_in_flight:policy.max_in_flight,
     remaining_tokens:Math.max(0,cap-used-reserved),estimated_runs_in_window:estimated,
@@ -169,7 +174,7 @@ export function reserveBudget(repoRoot,policy,{runId,taskId,tokens,kind='impleme
   return mutate(paths,ledger=>{
     const time=nowISO(now),check=admission(ledger,policy,runId,tokens,time);
     if (!check.allowed) throw new Error('budget: reserva denegada: '+check.reason+'.');
-    ledger.entries.push({run_id:runId,task_id:taskId,provider:'codex',kind,
+    ledger.entries.push({run_id:runId,task_id:taskId,provider:policy.provider,kind,
       reserved_tokens:tokens,status:'reserved',created_at:time});
     return {execution:'executed',run_id:runId,task_id:taskId,...summarize(ledger,policy,time)};
   });
@@ -202,7 +207,7 @@ export function settleBudget(repoRoot,{runId,usage=null,now=()=>new Date()}) {
     row.source=observed?'reported':'estimated';
     row.accounted_tokens=observed?.total_tokens??row.reserved_tokens;
     if(observed) row.usage=observed;
-    return {execution:'executed',run_id:runId,task_id:row.task_id,source:row.source,
+    return {execution:'executed',provider:row.provider,run_id:runId,task_id:row.task_id,source:row.source,
       reserved_tokens:row.reserved_tokens,accounted_tokens:row.accounted_tokens,
       over_reservation:row.accounted_tokens>row.reserved_tokens,
       token_limit_is_hard:false,cost_usd:null};
