@@ -39,6 +39,7 @@ test('crea plan sin ejecutar modelos y sin filtrar prompt a la consola',()=>with
   const p=planTaskExecution(packet(dir));
   assert.equal(p.execution,'dry-run');assert.equal(p.model_id,'gpt-test-small');
   assert.equal(p.argv.at(-1),'-');assert.ok(p.argv.includes('workspace-write'));
+  assert.deepEqual(p.argv.slice(0,3),['--ask-for-approval','never','exec']);
   assert.ok(!p.argv.includes('--dangerously-bypass-approvals-and-sandbox'));
   assert.equal(p.max_total_tokens,8000);
   assert.ok(p.prompt_bytes<=32768);
