@@ -5,6 +5,7 @@ import { scaffoldProject } from './scaffolder.js';
 import { runDoctor } from './doctor.js';
 import { PACKAGE_ROOT } from './utils.js';
 import { runPlanningCommand } from './backlog/command.js';
+import { runWorktreeCommand } from './worktree/command.js';
 
 export async function main() {
   const args = process.argv.slice(2);
@@ -36,6 +37,9 @@ ${colors.bold}COMANDOS & EJEMPLOS:${colors.reset}
   npx @arcav-ia/codex task verify TASK-001 --file backlog/tasks.json --repo . --run-tests --json
   npx @arcav-ia/codex task review TASK-001 --file backlog/tasks.json --repo . --run-tests --json
   npx @arcav-ia/codex task run TASK-001 --file backlog/tasks.json --models models.json --json
+  npx @arcav-ia/codex worktree create TASK-001 --file backlog/tasks.json --repo . --json
+  npx @arcav-ia/codex worktree status TASK-001 --repo . --json
+  npx @arcav-ia/codex worktree remove TASK-001 --repo . --json
 
 ${colors.bold}OPCIONES:${colors.reset}
   --doctor, --check-env            Ejecuta únicamente el diagnóstico de salud
@@ -43,6 +47,10 @@ ${colors.bold}OPCIONES:${colors.reset}
   -h, --help                       Muestra esta ayuda
 `);
     process.exit(0);
+  }
+
+  if (args[0] === 'worktree') {
+    process.exit(runWorktreeCommand(args.slice(1)));
   }
 
   if (args[0] === 'backlog' || args[0] === 'route' || args[0] === 'sprint' || args[0] === 'task') {
