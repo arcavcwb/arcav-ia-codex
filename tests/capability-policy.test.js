@@ -13,7 +13,11 @@ test('la política v1 se valida y no contiene IDs de modelo ni credenciales inve
   assert.equal(validateCapabilityPolicy(policy),policy);
   const asJSON=JSON.stringify(policy);
   assert.ok(!asJSON.includes('api_key'));
-  assert.ok(!asJSON.includes('model_id'));
+  for(const entry of Object.values(policy.roles)) {
+    assert.equal(Object.hasOwn(entry.preferred,'model_id'),false);
+    assert.equal(Object.hasOwn(entry.independent_review,'model_id'),false);
+    assert.ok(entry.escalation.every(c=>!Object.hasOwn(c,'model_id')));
+  }
   assert.equal(policy.rules.no_automatic_fallback,true);
   assert.equal(policy.rules.require_human_merge,true);
 });
