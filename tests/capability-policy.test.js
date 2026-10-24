@@ -27,7 +27,7 @@ test('frontend prefiere Antigravity con Claude Sonnet y escala a Opus',()=>{
   assert.equal(route.preferred.executor,'antigravity');
   assert.equal(route.preferred.model_family,'claude-sonnet');
   assert.equal(route.preferred.model_id,null);
-  assert.equal(route.preferred.adapter_implemented,false);
+  assert.equal(route.preferred.adapter_implemented,true);
   assert.equal(route.escalation[0].trigger,'verified_quality_failure');
   assert.equal(route.escalation[0].model_family,'claude-opus');
   assert.equal(route.escalation[1].executor,'codex');

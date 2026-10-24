@@ -80,7 +80,8 @@ export function planCapabilityRoute(backlog,taskId,role,policy) {
   if(unmet.length)reasons.push('dependencies_incomplete');
   const selected=policy.roles[role];
   const candidate=c=>({...c,model_id:null,model_id_verified:false,credentials_verified:false,
-    adapter_implemented:c.executor==='codex'});
+    adapter_implemented:c.executor==='codex'||
+      (role==='frontend'&&c.executor==='antigravity'&&c.model_family==='claude-sonnet')});
   return {
     execution:'dry-run',task_id:task.id,role,risk:task.risk,
     dispatch_ready:false,reason:reasons.length?reasons:['provider_and_model_require_validation'],
@@ -89,6 +90,6 @@ export function planCapabilityRoute(backlog,taskId,role,policy) {
     escalation:selected.escalation.map(c=>({trigger:c.trigger,...candidate(c)})),
     independent_review:candidate(selected.independent_review),
     guarantees:{...policy.rules},
-    note:'Preferencias, no modelos ejecutables. El scheduler actual sigue siendo Codex-only. No se invoca 9Router ni Antigravity.'
+    note:'Plan consultivo: adapter AGY frontend disponible vía antigravity dispatch (separado del scheduler Codex). Ningún modelo se invoca con capability route.'
   };
 }
