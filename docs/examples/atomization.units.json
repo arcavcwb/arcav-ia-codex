@@ -1,0 +1,45 @@
+{
+  "schema_version": 1,
+  "units": [
+    {
+      "key": "order-client",
+      "story_id": "US-001",
+      "title": "Asociar cliente a la orden",
+      "criteria": [
+        1
+      ],
+      "depends_on": []
+    },
+    {
+      "key": "order-items",
+      "story_id": "US-001",
+      "title": "Registrar prendas, cantidades y precios",
+      "criteria": [
+        2
+      ],
+      "depends_on": [
+        "order-client"
+      ]
+    },
+    {
+      "key": "receipt",
+      "story_id": "US-002",
+      "title": "Emitir comprobante",
+      "criteria": [
+        1
+      ],
+      "depends_on": [
+        "order-items"
+      ]
+    },
+    {
+      "key": "customer-search",
+      "story_id": "US-003",
+      "title": "Buscar clientes por nombre",
+      "criteria": [
+        1
+      ],
+      "depends_on": []
+    }
+  ]
+}

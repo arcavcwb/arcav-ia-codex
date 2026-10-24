@@ -2,6 +2,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { validateBacklog } from './validate.js';
 import { planBacklogFromPRD } from './prd.js';
+import { planBacklogFromPRDV2 } from './atomize-v2.js';
 import { loadModelProfiles, routeTask } from '../routing/router.js';
 import { planSprint } from '../sprint/planner.js';
 import { prepareTaskPacket } from '../execution/packet.js';
@@ -18,14 +19,14 @@ function readJSON(file) {
   }
 }
 function parseFlags(args) {
-  const options = {file:'backlog/tasks.json',models:null,out:null,json:false,capacity:null,repo:null,'max-context-bytes':null,'max-total-tokens':null,'timeout-seconds':null,execute:false,'run-tests':false,'test-timeout-seconds':null,'include-diff':false,'max-review-bytes':null}, positionals=[];
+  const options = {file:'backlog/tasks.json',units:null,models:null,out:null,json:false,capacity:null,repo:null,'max-context-bytes':null,'max-total-tokens':null,'timeout-seconds':null,execute:false,'run-tests':false,'test-timeout-seconds':null,'include-diff':false,'max-review-bytes':null}, positionals=[];
   for (let i=0; i<args.length; i++) {
     const arg=args[i];
     if (arg === '--json') {options.json=true;continue;}
     if (arg === '--execute') {options.execute=true;continue;}
     if (arg === '--run-tests') {options['run-tests']=true;continue;}
     if (arg === '--include-diff') {options['include-diff']=true;continue;}
-    if (arg === '--file' || arg === '--models' || arg === '--out' || arg === '--capacity' || arg === '--repo' || arg === '--max-context-bytes' || arg === '--max-total-tokens' || arg === '--timeout-seconds' || arg === '--test-timeout-seconds' || arg === '--max-review-bytes') {
+    if (arg === '--units' || arg === '--file' || arg === '--models' || arg === '--out' || arg === '--capacity' || arg === '--repo' || arg === '--max-context-bytes' || arg === '--max-total-tokens' || arg === '--timeout-seconds' || arg === '--test-timeout-seconds' || arg === '--max-review-bytes') {
       if (!args[i+1] || args[i+1].startsWith('--')) throw new Error(`${arg} requiere una ruta.`);
       options[arg.slice(2)] = args[++i];continue;
     }
@@ -41,6 +42,7 @@ export async function runPlanningCommand(args) {
     const {options,positionals} = parseFlags(args);
     const [command,subcommand,taskId,...extra] = positionals;
     if (extra.length) throw new Error('Demasiados argumentos.');
+    if (options.units && !(command === 'backlog' && subcommand === 'plan-v2')) throw new Error('--units sólo está disponible para backlog plan-v2.');
     if ((options['include-diff'] || options['max-review-bytes'] !== null) &&
         !(command === 'task' && (subcommand === 'review' || subcommand === 'review-run') && taskId)) {
       throw new Error('--include-diff y --max-review-bytes sólo corresponden a task review.');
@@ -206,6 +208,26 @@ export async function runPlanningCommand(args) {
       }
       return 0;
     }
+    if (command === 'backlog' && subcommand === 'plan-v2' && taskId) {
+      if (options['run-tests'] || options['test-timeout-seconds'] !== null || options.execute ||
+          options['max-total-tokens'] !== null || options['timeout-seconds'] !== null ||
+          options.models || options.capacity !== null || options.repo !== null ||
+          options['max-context-bytes'] !== null || options.file !== 'backlog/tasks.json') {
+        throw new Error('backlog plan-v2 sólo admite --units, --out y --json.');
+      }
+      const markdown=fs.readFileSync(path.resolve(taskId),'utf8');
+      const result=planBacklogFromPRDV2(markdown,{units:options.units ? readJSON(options.units) : null});
+      for(const w of result.warnings) console.error(`WARN ${w}`);
+      const output=JSON.stringify(result.backlog,null,2)+'\n';
+      if(options.out) {
+        const target=path.resolve(options.out);
+        fs.mkdirSync(path.dirname(target),{recursive:true});
+        fs.writeFileSync(target,output,{encoding:'utf8',flag:'wx'});
+        console.log(`Backlog V2 borrador: ${target} (${result.stats.tasks} tareas, ${result.coverage.length} criterios).`);
+      } else if(options.json) console.log(JSON.stringify(result,null,2));
+      else process.stdout.write(output);
+      return 0;
+    }
     if (command === 'backlog' && subcommand === 'plan' && taskId) {
       if (options['run-tests'] || options['test-timeout-seconds'] !== null || options.execute || options['max-total-tokens'] !== null || options['timeout-seconds'] !== null || options.models || options.capacity !== null || options.repo !== null || options['max-context-bytes'] !== null || options.file !== 'backlog/tasks.json') {
         throw new Error('backlog plan sólo admite --out y --json.');
@@ -256,7 +278,7 @@ export async function runPlanningCommand(args) {
       }
       return 0;
     }
-    throw new Error('Comando esperado: backlog plan PRD.md [--out ruta] [--json], backlog validate [--file ruta], route TASK-ID [--file ruta] [--models ruta] [--json] o sprint plan --capacity N [--file ruta] [--models ruta] [--json], task prepare TASK-ID [--file ruta] [--repo directorio] [--max-context-bytes N] [--models ruta] [--json] o task run TASK-ID --models ruta [--max-total-tokens N] [--timeout-seconds N] [--execute] o task verify TASK-ID [--file ruta] [--repo directorio] [--run-tests] [--test-timeout-seconds N] [--json] o task review TASK-ID [--file ruta] [--repo directorio] [--models ruta] [--run-tests] [--include-diff] [--max-review-bytes N] [--json].');
+    throw new Error('Comando esperado: backlog plan-v2 PRD.md [--units archivo] [--out ruta] [--json], backlog plan PRD.md [--out ruta] [--json], backlog validate [--file ruta], route TASK-ID [--file ruta] [--models ruta] [--json] o sprint plan --capacity N [--file ruta] [--models ruta] [--json], task prepare TASK-ID [--file ruta] [--repo directorio] [--max-context-bytes N] [--models ruta] [--json] o task run TASK-ID --models ruta [--max-total-tokens N] [--timeout-seconds N] [--execute] o task verify TASK-ID [--file ruta] [--repo directorio] [--run-tests] [--test-timeout-seconds N] [--json] o task review TASK-ID [--file ruta] [--repo directorio] [--models ruta] [--run-tests] [--include-diff] [--max-review-bytes N] [--json].');
   } catch(error) {
     console.error(error.message);
     return 1;
